@@ -8,11 +8,30 @@ export const socialProviderNames: Record<SocialProviderId, string> = {
   github: "GitHub",
 };
 
+/** Accept only app destinations, including NextAuth's absolute callback URLs. */
+export function safeSignInDestination(
+  callback: string | null,
+  origin = "https://local.invalid",
+): string {
+  if (!callback) return "/documents";
+  try {
+    const url = new URL(callback, origin);
+    if (url.origin !== new URL(origin).origin) return "/documents";
+    if (
+      url.pathname === "/account" ||
+      /^\/documents(?:\/[a-zA-Z0-9_-]+)?$/.test(url.pathname)
+    ) return url.pathname;
+  } catch {
+    // Malformed or external callback URLs never become navigation targets.
+  }
+  return "/documents";
+}
+
 /** Keep provider/server details out of the sign-in error shown to the user. */
 export function oauthErrorMessage(error: string): string {
   switch (error) {
     case "OAuthAccountNotLinked":
-      return "An account with this email already exists. Sign in with the method you originally used. For your security, we don’t automatically link different sign-in methods.";
+      return "An account with this email already exists. Sign in with your original method, then open Account settings to connect Google or GitHub.";
     case "AccessDenied":
       return "Sign-in permission wasn’t granted. Try again and allow access, or use your original sign-in method.";
     case "OAuthSignin":

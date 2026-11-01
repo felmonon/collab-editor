@@ -3,7 +3,7 @@ services:
     name: collab-editor-socket
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm ci && npm run prisma:generate
     startCommand: npm run start:socket
     envVars:
       - key: NODE_ENV
@@ -11,4 +11,8 @@ services:
       - key: SOCKET_PORT
         value: 10000
       - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
         sync: false

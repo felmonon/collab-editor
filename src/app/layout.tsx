@@ -15,7 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Collab Editor - Real-Time Collaborative Documents",
-  description: "A Notion-style collaborative document editor with real-time sync",
+  description:
+    "A calm workspace for writing, sharing, and shaping ideas together. Try the interactive editor without an account.",
 };
 
 export default function RootLayout({
@@ -24,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

@@ -3,7 +3,8 @@
 import { forwardRef, ButtonHTMLAttributes, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "oauth";
+type ButtonVariant =
+  "primary" | "secondary" | "outline" | "ghost" | "danger" | "oauth";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -78,7 +79,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       children,
       ...props
     },
-    ref
+    ref,
   ) => {
     const isDisabled = disabled || loading;
 
@@ -112,7 +113,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
       </button>
     );
-  }
+  },
 );
 
 Button.displayName = "Button";
@@ -153,52 +154,29 @@ const GitHubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export function OAuthButton({ provider, size = "lg", fullWidth = true, loading, ...props }: OAuthButtonProps) {
-  if (provider === "github") {
-    return (
-      <button
-        disabled={loading || props.disabled}
-        className={`
-          inline-flex items-center justify-center gap-2.5
-          w-full px-6 py-3.5 text-base font-medium
-          bg-gray-900 text-white rounded-xl
-          hover:bg-gray-800 active:bg-gray-950
-          transition-all duration-200
-          disabled:opacity-50 disabled:cursor-not-allowed
-          shadow-sm hover:shadow
-        `}
-        {...props}
-      >
-        {loading ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : (
-          <GitHubIcon className="w-5 h-5" />
-        )}
-        Continue with GitHub
-      </button>
-    );
-  }
-
+export function OAuthButton({
+  provider,
+  size = "lg",
+  fullWidth = true,
+  loading,
+  ...props
+}: OAuthButtonProps) {
   return (
-    <button
-      disabled={loading || props.disabled}
-      className={`
-        inline-flex items-center justify-center gap-2.5
-        w-full px-6 py-3.5 text-base font-medium
-        bg-white text-gray-700 border border-gray-200 rounded-xl
-        hover:bg-gray-50 hover:border-gray-300 hover:shadow-md active:bg-gray-100
-        transition-all duration-200
-        disabled:opacity-50 disabled:cursor-not-allowed
-        shadow-sm
-      `}
+    <Button
       {...props}
+      variant={provider === "github" ? "primary" : "oauth"}
+      size={size}
+      fullWidth={fullWidth}
+      loading={loading}
+      icon={
+        provider === "github" ? (
+          <GitHubIcon className="w-5 h-5" />
+        ) : (
+          <GoogleIcon className="w-5 h-5" />
+        )
+      }
     >
-      {loading ? (
-        <Loader2 className="w-5 h-5 animate-spin" />
-      ) : (
-        <GoogleIcon className="w-5 h-5" />
-      )}
-      Continue with Google
-    </button>
+      Continue with {provider === "github" ? "GitHub" : "Google"}
+    </Button>
   );
 }

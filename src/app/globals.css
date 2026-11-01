@@ -56,8 +56,10 @@
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-lg:
+    0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl:
+    0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 
   /* Border Radius */
   --radius-sm: 0.375rem;
@@ -87,7 +89,11 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-family:
+    var(--font-sans),
+    system-ui,
+    -apple-system,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -95,11 +101,15 @@ body {
 /* Focus Ring Styles */
 .focus-ring {
   outline: none;
-  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .focus-ring:focus-visible {
-  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--ring);
 }
 
 /* Custom Scrollbar */
@@ -123,8 +133,12 @@ body {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fadeInUp {
@@ -172,24 +186,51 @@ body {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-  20%, 40%, 60%, 80% { transform: translateX(4px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-4px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(4px);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .animate-fade-in {
@@ -243,10 +284,22 @@ body {
   transition: all var(--transition-base);
 }
 
-.password-strength-weak { background: var(--error-500); width: 25%; }
-.password-strength-fair { background: var(--warning-500); width: 50%; }
-.password-strength-good { background: var(--primary-500); width: 75%; }
-.password-strength-strong { background: var(--success-500); width: 100%; }
+.password-strength-weak {
+  background: var(--error-500);
+  width: 25%;
+}
+.password-strength-fair {
+  background: var(--warning-500);
+  width: 50%;
+}
+.password-strength-good {
+  background: var(--primary-500);
+  width: 75%;
+}
+.password-strength-strong {
+  background: var(--success-500);
+  width: 100%;
+}
 
 /* Toast Notifications */
 .toast-container {
@@ -297,11 +350,20 @@ body {
 
 /* Gradient Backgrounds */
 .gradient-hero {
-  background: linear-gradient(135deg, var(--primary-50) 0%, var(--background) 50%, var(--gray-50) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-50) 0%,
+    var(--background) 50%,
+    var(--gray-50) 100%
+  );
 }
 
 .gradient-card {
-  background: linear-gradient(180deg, var(--background) 0%, var(--gray-50) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--background) 0%,
+    var(--gray-50) 100%
+  );
 }
 
 /* Glass Effect */
@@ -347,7 +409,8 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.prose ul, .prose ol {
+.prose ul,
+.prose ol {
   padding-left: 1.5rem;
   margin-bottom: 0.75rem;
 }
@@ -385,4 +448,100 @@ body {
 .prose pre code {
   background-color: transparent;
   padding: 0;
+}
+
+/* Shared workspace polish */
+:root {
+  --foreground: #162333;
+  --ring: #167d72;
+}
+html {
+  scroll-behavior: smooth;
+}
+button,
+a,
+input,
+select,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled),
+summary {
+  cursor: pointer;
+}
+:where(a, button, input, select, summary, textarea):focus-visible {
+  outline: 2px solid #167d72;
+  outline-offset: 3px;
+}
+.editor-prose {
+  padding: 28px 64px 72px;
+  min-height: 520px;
+  color: #475569;
+  font-size: 15px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.editor-prose h1,
+.editor-prose h2,
+.editor-prose h3 {
+  color: #162333;
+  letter-spacing: -0.025em;
+  scroll-margin-top: 150px;
+}
+.editor-prose h1 {
+  font-size: 1.9rem;
+}
+.editor-prose h2 {
+  font-size: 1.4rem;
+  margin-top: 1.7em;
+}
+.editor-prose h3 {
+  font-size: 1.1rem;
+}
+.editor-prose blockquote {
+  border-color: #167d72;
+  background: #f4f8f6;
+  padding: 2px 20px;
+  color: #496b62;
+}
+.editor-prose a {
+  color: #167d72;
+  text-decoration: underline;
+}
+.editor-prose li p {
+  margin: 0;
+}
+.editor-prose p:first-child {
+  margin-top: 0;
+}
+.editor-prose > :last-child {
+  margin-bottom: 0;
+}
+.editor-prose pre {
+  white-space: pre-wrap;
+}
+.editor-prose [contenteditable="false"] {
+  cursor: default;
+}
+.toast {
+  min-width: min(300px, calc(100vw - 2rem));
+  max-width: min(420px, calc(100vw - 2rem));
+}
+@media (max-width: 640px) {
+  .editor-prose {
+    padding: 24px 24px 48px;
+    min-height: 400px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -5,6 +5,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
+import { requestGithubToken } from "./github-oauth";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -55,6 +56,10 @@ export const authOptions: NextAuthOptions = {
           GithubProvider({
             clientId: process.env.GITHUB_ID,
             clientSecret: process.env.GITHUB_SECRET,
+            token: {
+              url: "https://github.com/login/oauth/access_token",
+              request: requestGithubToken,
+            },
           }),
         ]
       : []),

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -38,6 +38,7 @@ import {
   type DocumentTemplate,
 } from "@/components/documents/document-templates";
 import { DeleteDocumentDialog } from "@/components/documents/delete-document-dialog";
+import { recoverExpiredSession, SESSION_RECOVERY_ERROR, signOutSafely } from "@/lib/auth-session-client";
 
 type Filter = "all" | "mine" | "shared";
 type Sort = "updated" | "oldest" | "name";
@@ -51,11 +52,34 @@ const filters: { id: Filter; label: string; icon: typeof FileText }[] = [
 export default function DocumentsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  useEffect(() => {
+    if (status === "unauthenticated") router.replace("/login");
+  }, [status, router]);
+
+  if (status !== "authenticated" || !session?.user?.id)
+    return (
+      <div role="status" className="flex min-h-screen items-center justify-center gap-3 bg-[#f6f7fb] text-sm text-[#747985]">
+        <Loader2 className="h-5 w-5 animate-spin text-[#315bee]" aria-hidden="true" />
+        Opening your workspace…
+      </div>
+    );
+
+  // A session change must never display the previous account's document list.
+  return <DocumentsWorkspace key={session.user.id} user={session.user} />;
+}
+
+function DocumentsWorkspace({ user }: {
+  user: { id: string; name?: string | null; email?: string | null };
+}) {
+  const router = useRouter();
   const { addToast } = useToast();
   const [documents, setDocuments] = useState<WorkspaceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("updated");
@@ -64,12 +88,18 @@ export default function DocumentsPage() {
     useState<WorkspaceDocument | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const mobileNavigation = useRef<HTMLDialogElement>(null);
-  const userId = session?.user?.id;
-  const userName = session?.user?.name || "Your account";
+  const active = useRef(false);
+  const createRequest = useRef<AbortController | null>(null);
+  const userId = user.id;
+  const userName = user.name || "Your account";
 
   useEffect(() => {
-    if (status === "unauthenticated") router.replace("/login");
-  }, [status, router]);
+    active.current = true;
+    return () => {
+      active.current = false;
+      createRequest.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
@@ -100,28 +130,29 @@ export default function DocumentsPage() {
     (signal?: AbortSignal) => {
       return fetch("/api/documents", { signal })
         .then(async (response) => {
+          if (!active.current || signal?.aborted) return;
           if (response.status === 401) {
-            router.replace("/login");
+            await recoverExpiredSession("/documents");
             return;
           }
           if (!response.ok) throw new Error("Failed to load documents");
           const data = await response.json();
           if (!Array.isArray(data)) throw new Error("Unexpected response");
-          if (signal?.aborted) return;
+          if (!active.current || signal?.aborted) return;
           setDocuments(data);
           setError("");
         })
-        .catch(() => {
-          if (!signal?.aborted)
-            setError(
-              "Your documents couldn’t be loaded. Check your connection and try again.",
-            );
+        .catch((error) => {
+          if (active.current && !signal?.aborted)
+            setError(error instanceof Error && error.message === SESSION_RECOVERY_ERROR
+              ? SESSION_RECOVERY_ERROR
+              : "Your documents couldn’t be loaded. Check your connection and try again.");
         })
         .finally(() => {
-          if (!signal?.aborted) setLoading(false);
+          if (active.current && !signal?.aborted) setLoading(false);
         });
     },
-    [router],
+    [],
   );
 
   useEffect(() => {
@@ -134,25 +165,54 @@ export default function DocumentsPage() {
   const createDocument = async (
     template: DocumentTemplate = documentTemplates[0],
   ) => {
-    if (creating) return;
+    if (creating || createRequest.current) return;
+    const controller = new AbortController();
+    createRequest.current = controller;
     setCreating(template.id);
     try {
       const response = await fetch("/api/documents", {
         method: "POST",
+        signal: controller.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: template.documentTitle,
           content: template.content,
         }),
       });
+      if (!active.current || controller.signal.aborted) return;
+      if (response.status === 401) {
+        await recoverExpiredSession("/documents");
+        return;
+      }
       if (!response.ok) throw new Error("Failed to create document");
       const document = await response.json();
+      if (!active.current || controller.signal.aborted) return;
+      if (typeof document?.id !== "string" || !document.id)
+        throw new Error("Invalid document response");
       router.push(`/documents/${document.id}`);
-    } catch {
-      addToast("Your document couldn’t be created. Please try again.", "error");
+    } catch (error) {
+      if (!active.current || controller.signal.aborted) return;
+      addToast(error instanceof Error && error.message === SESSION_RECOVERY_ERROR
+        ? SESSION_RECOVERY_ERROR
+        : "Your document couldn’t be created. Please try again.", "error");
       setCreating(null);
+    } finally {
+      if (createRequest.current === controller) createRequest.current = null;
     }
   };
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError("");
+    try {
+      await signOutSafely();
+    } catch {
+      if (!active.current) return;
+      setSigningOut(false);
+      setSignOutError("Couldn’t sign out. Check your connection and try again.");
+    }
+  }
 
   const counts = useMemo(
     () => ({
@@ -324,6 +384,7 @@ export default function DocumentsPage() {
           <Settings2 size={15} aria-hidden="true" />
           Account settings
         </Link>
+        {signOutError && <p role="alert" className="mb-3 text-xs leading-5 text-red-200">{signOutError}</p>}
         <div className="flex items-center gap-2.5">
           <Initials name={userName} inverted />
           <div className="min-w-0 flex-1">
@@ -331,36 +392,23 @@ export default function DocumentsPage() {
               {userName}
             </p>
             <p className="mt-0.5 truncate text-[11px] text-[#a5adbe]">
-              {session?.user?.email}
+              {user.email}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            aria-label="Sign out"
-            title="Sign out"
-            className="focus-ring rounded-lg p-2 text-[#6d778c] hover:bg-white/5 hover:text-white"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            aria-label={signingOut ? "Signing out…" : "Sign out"}
+            title={signingOut ? "Signing out…" : "Sign out"}
+            className="focus-ring rounded-lg p-2 text-[#6d778c] hover:bg-white/5 hover:text-white disabled:cursor-wait disabled:opacity-60"
           >
-            <LogOut size={15} aria-hidden="true" />
+            {signingOut ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <LogOut size={15} aria-hidden="true" />}
           </button>
         </div>
       </div>
     </>
   );
-
-  if (status !== "authenticated")
-    return (
-      <div
-        role="status"
-        className="flex min-h-screen items-center justify-center gap-3 bg-[#f6f7fb] text-sm text-[#747985]"
-      >
-        <Loader2
-          className="h-5 w-5 animate-spin text-[#315bee]"
-          aria-hidden="true"
-        />
-        Opening your workspace…
-      </div>
-    );
 
   return (
     <div className="min-h-screen bg-[#f6f7fb] text-[#171923] lg:pl-[232px]">
@@ -421,7 +469,7 @@ export default function DocumentsPage() {
             className="hidden h-5 w-px bg-[#e9ebf2] sm:block"
             aria-hidden="true"
           />
-          <AccountMenu name={userName} email={session.user.email} />
+          <AccountMenu name={userName} email={user.email} />
         </div>
       </header>
 
@@ -682,12 +730,13 @@ export default function DocumentsPage() {
         <DeleteDocumentDialog
           document={documentToDelete}
           onClose={() => setDocumentToDelete(null)}
-          onDeleted={(id) => {
+          onSessionExpired={() => recoverExpiredSession("/documents")}
+          onDeleted={(id, confirmedDeletion) => {
             setDocuments((previous) =>
               previous.filter((document) => document.id !== id),
             );
             setDocumentToDelete(null);
-            addToast("Document deleted", "success");
+            addToast(confirmedDeletion ? "Document deleted" : "This document is no longer available in your workspace.", "success");
           }}
         />
       )}

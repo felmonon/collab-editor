@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { recoverExpiredSession } from "@/lib/auth-session-client";
 
 interface Share {
   id: string;
@@ -24,6 +25,7 @@ export function ShareDialog({
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const requestController = useRef<AbortController | null>(null);
   const [shares, setShares] = useState<Share[] | null>(null);
   const [email, setEmail] = useState("");
   const [permission, setPermission] = useState("EDIT");
@@ -33,8 +35,19 @@ export function ShareDialog({
   const [loadError, setLoadError] = useState("");
   const { addToast } = useToast();
   const load = useCallback(() => {
-    return fetch(`/api/documents/${documentId}/shares`)
+    const controller = requestController.current;
+    if (!controller || controller.signal.aborted) return Promise.resolve();
+    const active = () =>
+      requestController.current === controller && !controller.signal.aborted;
+    return fetch(`/api/documents/${documentId}/shares`, {
+      signal: controller.signal,
+    })
       .then(async (res) => {
+        if (!active()) return null;
+        if (res.status === 401) {
+          await recoverExpiredSession(`/documents/${documentId}`);
+          return null;
+        }
         if (!res.ok)
           throw new Error(
             "We couldn’t refresh the access list. Existing access hasn’t been verified.",
@@ -42,12 +55,14 @@ export function ShareDialog({
         return res.json();
       })
       .then((data) => {
+        if (!active() || data === null) return;
         if (!Array.isArray(data.shares))
           throw new Error("Unable to read the access list.");
         setShares(data.shares);
         setLoadError("");
       })
       .catch((error) => {
+        if (!active()) return;
         setShares(null);
         setLoadError(
           error instanceof Error
@@ -55,27 +70,49 @@ export function ShareDialog({
             : "Unable to load sharing settings.",
         );
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (active()) setLoading(false);
+      });
   }, [documentId]);
   useEffect(() => {
-    dialogRef.current?.showModal();
+    const controller = new AbortController();
+    requestController.current = controller;
+    const dialog = dialogRef.current;
+    dialog?.showModal();
     void load();
+    return () => {
+      controller.abort();
+      if (requestController.current === controller)
+        requestController.current = null;
+      dialog?.close();
+    };
   }, [load]);
   async function changeAccess(method: "POST" | "DELETE", targetEmail: string) {
-    if (busy || loading) return;
+    const controller = requestController.current;
+    if (busy || loading || !controller || controller.signal.aborted) return;
+    const active = () =>
+      requestController.current === controller && !controller.signal.aborted;
     setBusy(true);
     setError("");
     try {
       const res = await fetch(`/api/documents/${documentId}/shares`, {
         method,
+        signal: controller.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: targetEmail, permission }),
       });
+      if (!active()) return;
+      if (res.status === 401) {
+        await recoverExpiredSession(`/documents/${documentId}`);
+        return;
+      }
       const data = await res.json();
+      if (!active()) return;
       if (!res.ok) throw new Error(data.error || "Couldn’t update access.");
       setEmail("");
       setLoading(true);
       await load();
+      if (!active()) return;
       addToast(
         method === "POST"
           ? "Access updated. Send your collaborator the document link."
@@ -83,11 +120,12 @@ export function ShareDialog({
         "success",
       );
     } catch (error) {
+      if (!active()) return;
       setError(
         error instanceof Error ? error.message : "Couldn’t update access.",
       );
     } finally {
-      setBusy(false);
+      if (active()) setBusy(false);
     }
   }
   return (
@@ -286,6 +324,7 @@ export function ShareDialog({
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(window.location.href);
+              setError("");
               addToast("Document link copied.", "success");
             } catch {
               setError(

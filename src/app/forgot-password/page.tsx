@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
         <div className="my-8 divide-y divide-[#e6e8ef] rounded-xl border border-[#e6e8ef] bg-white px-5 sm:px-6">
           <div className="py-5">
             <h2 className="text-sm font-semibold">
-              Signed up with Google or GitHub?
+              Signed up with Google, Apple, or GitHub?
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#686e7c]">
               Choose that provider on the sign-in page. You don’t need a
@@ -38,8 +38,17 @@ export default function ForgotPasswordPage() {
               Forgot your account password?
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#686e7c]">
-              Password reset emails aren’t available yet. Contact the person who
-              runs this workspace for help recovering access.
+              Password reset emails aren’t available yet. For help with access,
+              email support from the address associated with your account.
+            </p>
+            <a
+              href="mailto:felmonon@gmail.com?subject=Collab%20Editor%20account%20access"
+              className="focus-ring mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-md text-sm font-semibold text-[#315BEE] hover:underline"
+            >
+              Contact support <ArrowUpRight size={14} aria-hidden="true" />
+            </a>
+            <p className="mt-1 break-all text-xs leading-6 text-[#686e7c]">
+              felmonon@gmail.com
             </p>
           </div>
         </div>

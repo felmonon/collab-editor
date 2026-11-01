@@ -20,6 +20,10 @@ import {
 import { BrandLogo } from "@/components/ui/brand";
 import { Initials } from "@/components/documents/document-collection";
 import {
+  recoverExpiredSession,
+  SESSION_RECOVERY_ERROR,
+} from "@/lib/auth-session-client";
+import {
   socialProviderNames,
   type SocialProviderId,
 } from "@/lib/auth-providers";
@@ -173,7 +177,7 @@ function AccountSettings({
     })
       .then(async (response) => {
         if (response.status === 401) {
-          if (active) router.replace(loginUrl);
+          if (active) await recoverExpiredSession("/account");
           return;
         }
         if (!response.ok) throw new Error("Account methods unavailable");
@@ -194,8 +198,12 @@ function AccountSettings({
             data: { providers: data.providers, hasPassword: data.hasPassword },
           });
       })
-      .catch(() => {
-        if (active) setAccount({ status: "error" });
+      .catch((error: unknown) => {
+        if (active) {
+          setAccount({ status: "error" });
+          if (error instanceof Error && error.message === SESSION_RECOVERY_ERROR)
+            setActionError(SESSION_RECOVERY_ERROR);
+        }
       })
       .finally(() => window.clearTimeout(timeout));
     return () => {
@@ -264,7 +272,7 @@ function AccountSettings({
       });
       if (!activeRef.current || controller.signal.aborted) return;
       if (response.status === 401) {
-        router.replace(loginUrl);
+        await recoverExpiredSession("/account");
         return;
       }
       if (!response.ok) throw new Error("Connection could not start");
@@ -296,10 +304,12 @@ function AccountSettings({
         else if ("ok" in redirectResult && redirectResult.ok === false)
           throw new Error("Connection could not start");
       }
-    } catch {
+    } catch (error) {
       if (activeRef.current)
         setActionError(
-          `We couldn’t start the ${socialProviderNames[provider]} connection. Please try again from this page.`,
+          error instanceof Error && error.message === SESSION_RECOVERY_ERROR
+            ? SESSION_RECOVERY_ERROR
+            : `We couldn’t start the ${socialProviderNames[provider]} connection. Please try again from this page.`,
         );
     } finally {
       window.clearTimeout(timeout);

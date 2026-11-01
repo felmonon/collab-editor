@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { signOutSafely } from "@/lib/auth-session-client";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronDown, Loader2, LogOut, Settings2 } from "lucide-react";
 
@@ -101,7 +101,7 @@ export function AccountMenu({
     setSigningOut(true);
     setError("");
     try {
-      await signOut({ callbackUrl: "/login" });
+      await signOutSafely();
     } catch {
       setSigningOut(false);
       setError(

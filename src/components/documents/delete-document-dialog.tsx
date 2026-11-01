@@ -2,41 +2,71 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FileText, Loader2, Trash2 } from "lucide-react";
+import { deleteDocumentWithReconciliation } from "@/lib/documents/delete-document";
+import { SESSION_RECOVERY_ERROR } from "@/lib/auth-session-client";
 
 interface DeleteDocumentDialogProps {
   document: { id: string; title: string };
   onClose: () => void;
-  onDeleted: (id: string) => void;
+  onDeleted: (id: string, confirmedDeletion: boolean) => void;
+  onSessionExpired: () => Promise<void>;
 }
 
 export function DeleteDocumentDialog({
   document: selectedDocument,
   onClose,
   onDeleted,
+  onSessionExpired,
 }: DeleteDocumentDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [deleting, setDeleting] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const active = useRef(false);
+  const request = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    active.current = true;
     const element = dialog.current;
     element?.showModal();
-    return () => element?.close();
+    return () => {
+      active.current = false;
+      request.current?.abort();
+      element?.close();
+    };
   }, []);
 
   const deleteDocument = async () => {
+    if (request.current) return;
+    const controller = new AbortController();
+    request.current = controller;
     setDeleting(true);
+    setChecking(false);
     setError("");
     try {
-      const response = await fetch(`/api/documents/${selectedDocument.id}`, {
-        method: "DELETE",
+      const result = await deleteDocumentWithReconciliation(selectedDocument.id, {
+        signal: controller.signal,
+        onChecking: () => { if (active.current) setChecking(true); },
       });
-      if (!response.ok)
-        throw new Error("We couldn’t delete this document. Please try again.");
-      onDeleted(selectedDocument.id);
-    } catch {
-      setError("We couldn’t delete this document. Please try again.");
-      setDeleting(false);
+      if (!active.current || controller.signal.aborted) return;
+      if (result.status === "unauthorized") {
+        await onSessionExpired();
+      } else if (result.status === "error") {
+        setError(result.message);
+      } else {
+        onDeleted(selectedDocument.id, result.status === "deleted");
+      }
+    } catch (error) {
+      if (active.current && !controller.signal.aborted)
+        setError(error instanceof Error && error.message === SESSION_RECOVERY_ERROR
+          ? SESSION_RECOVERY_ERROR
+          : "We couldn’t confirm whether the document was deleted. Close this dialog and refresh your workspace before trying again.");
+    } finally {
+      if (request.current === controller) request.current = null;
+      if (active.current) {
+        setDeleting(false);
+        setChecking(false);
+      }
     }
   };
 
@@ -45,6 +75,7 @@ export function DeleteDocumentDialog({
       ref={dialog}
       aria-labelledby="delete-document-title"
       aria-describedby="delete-document-description"
+      aria-busy={deleting || undefined}
       onCancel={(event) => {
         event.preventDefault();
         if (!deleting) onClose();
@@ -93,7 +124,7 @@ export function DeleteDocumentDialog({
           onClick={onClose}
           className="focus-ring rounded-lg border border-[#e1e5ef] px-4 py-2.5 text-[12px] font-medium text-[#6a7284] hover:bg-[#f5f6fb] disabled:opacity-50"
         >
-          Keep document
+          {error ? "Close" : "Keep document"}
         </button>
         <button
           type="button"
@@ -104,7 +135,7 @@ export function DeleteDocumentDialog({
           {deleting && (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           )}
-          {deleting ? "Deleting…" : "Delete document"}
+          {checking ? "Checking status…" : deleting ? "Deleting…" : error ? "Try delete again" : "Delete document"}
         </button>
       </div>
     </dialog>

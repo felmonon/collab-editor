@@ -1,6 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Loader2, LockKeyhole, RefreshCw, UserPlus, X } from "lucide-react";
+import {
+  Copy,
+  Loader2,
+  LockKeyhole,
+  RefreshCw,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 
 interface Share {
@@ -34,7 +42,8 @@ export function ShareDialog({
         return res.json();
       })
       .then((data) => {
-        if (!Array.isArray(data.shares)) throw new Error("Unable to read the access list.");
+        if (!Array.isArray(data.shares))
+          throw new Error("Unable to read the access list.");
         setShares(data.shares);
         setLoadError("");
       })
@@ -88,27 +97,39 @@ export function ShareDialog({
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      className="fixed inset-0 m-auto w-[calc(100%_-_2rem)] max-w-lg rounded-2xl border bg-white p-0 text-[#162333] shadow-xl backdrop:bg-slate-950/30"
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-[520px] overflow-y-auto rounded-2xl border border-[#e6e8ef] bg-white p-0 text-[#171923] shadow-[0_24px_100px_-20px_#17192360] backdrop:bg-[#171923]/40 backdrop:backdrop-blur-sm"
       aria-labelledby="share-title"
+      aria-describedby="share-description"
     >
-      <div className="p-6 sm:p-8">
-        <div className="mb-5 flex items-start justify-between">
+      <div className="border-b border-[#e6e8ef] px-6 py-6 sm:px-8">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="share-title" className="text-xl font-semibold">
-              Better with a second perspective.
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef2ff] text-[#315bee]">
+              <Users size={19} />
+            </div>
+            <h2
+              id="share-title"
+              className="text-[23px] font-semibold tracking-[-0.035em]"
+            >
+              Share document
             </h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Invite someone to this document.
+            <p
+              id="share-description"
+              className="mt-1.5 text-sm leading-6 text-[#626977]"
+            >
+              Choose who can read or edit this document.
             </p>
           </div>
           <button
             aria-label="Close sharing"
             onClick={onClose}
-            className="-mr-2 -mt-2 rounded p-2 hover:bg-slate-100"
+            className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#626977] hover:bg-[#f6f7fb] hover:text-[#171923] focus-visible:outline-2 focus-visible:outline-[#315bee]"
           >
             <X size={18} />
           </button>
         </div>
+      </div>
+      <div className="px-6 py-6 sm:px-8">
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -117,11 +138,11 @@ export function ShareDialog({
         >
           <label
             htmlFor="share-email"
-            className="mb-2 block text-xs font-medium"
+            className="mb-2.5 block text-xs font-semibold text-[#353b49]"
           >
-            Collaborator’s email
+            Add a collaborator
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               id="share-email"
               type="email"
@@ -130,51 +151,81 @@ export function ShareDialog({
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@example.com"
-              className="min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-sm"
+              className="h-12 min-w-0 basis-full rounded-xl border border-[#e0e3ec] bg-[#fafbfe] px-3.5 text-sm outline-none placeholder:text-[#a0a5b1] focus:border-[#315bee] focus:ring-2 focus:ring-[#315bee]/10 disabled:opacity-50 sm:flex-1 sm:basis-auto"
             />
             <select
               aria-label="Access level"
               disabled={busy || loading}
               value={permission}
               onChange={(event) => setPermission(event.target.value)}
-              className="rounded-lg border px-2 text-sm"
+              className="h-12 rounded-xl border border-[#e0e3ec] bg-white px-3 text-xs font-medium outline-none focus:border-[#315bee] focus:ring-2 focus:ring-[#315bee]/10 disabled:opacity-50"
             >
               <option value="EDIT">Can edit</option>
               <option value="VIEW">Can view</option>
             </select>
           </div>
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            They’ll need a Collab Editor account with this email. No email
-            invitation is sent.
+          <p className="mt-2.5 text-xs leading-5 text-[#626977]">
+            {permission === "EDIT"
+              ? "Can write and rename this document. Only you manage access."
+              : "Can read this document and download a copy."}
           </p>
           <button
             disabled={busy || loading}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#167d72] py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#315bee] px-4 py-3 text-xs font-semibold text-white transition-colors hover:bg-[#244bd5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#315bee] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? (
-              <Loader2 className="animate-spin" size={16} />
+              <Loader2 className="animate-spin" size={15} />
             ) : (
-              <UserPlus size={16} />
+              <UserPlus size={15} />
             )}{" "}
             Add collaborator
           </button>
+          <p className="mt-3 text-[11px] leading-5 text-[#626977]">
+            They need a Collab Editor account with this email. No invitation
+            email is sent; share the document link after adding them.
+          </p>
         </form>
         {error && (
           <p
             role="alert"
-            className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+            className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs leading-5 text-red-700"
           >
             {error}
           </p>
         )}
-        <div className="mt-6 border-t pt-5">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <div className="mt-6 border-t border-[#e6e8ef] pt-5">
+          <p className="mb-4 flex items-center justify-between text-xs font-semibold text-[#353b49]">
             People with access
+            <span className="text-[10px] font-normal text-[#626977]">
+              Managed by you
+            </span>
           </p>
+          <div className="mb-4 flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#191b23] text-white">
+              <LockKeyhole size={14} />
+            </span>
+            <div className="flex-1">
+              <p className="text-xs font-medium">You</p>
+              <p className="mt-0.5 text-[11px] text-[#626977]">
+                Document owner
+              </p>
+            </div>
+            <span className="rounded-md bg-[#f6f7fb] px-2 py-1 text-[10px] font-medium text-[#626977]">
+              Owner
+            </span>
+          </div>
           {loading ? (
-            <p role="status" className="text-sm text-slate-500">Refreshing access…</p>
+            <p
+              role="status"
+              className="flex items-center gap-2 py-2 text-xs text-[#626977]"
+            >
+              <Loader2 size={14} className="animate-spin" /> Refreshing access…
+            </p>
           ) : loadError ? (
-            <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <div
+              role="alert"
+              className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"
+            >
               <p>{loadError}</p>
               <button
                 type="button"
@@ -183,28 +234,32 @@ export function ShareDialog({
                   setLoading(true);
                   void load();
                 }}
-                className="mt-3 inline-flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-300 px-3 text-xs font-semibold disabled:opacity-50"
               >
                 <RefreshCw size={13} /> Retry access list
               </button>
             </div>
           ) : shares?.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              Only you have access so far.
+            <p className="rounded-xl bg-[#f6f7fb] px-4 py-3 text-xs leading-5 text-[#626977]">
+              No collaborators yet. Add someone above to work together.
             </p>
           ) : (
-            <ul className="max-h-52 space-y-4 overflow-auto">
+            <ul className="max-h-52 space-y-3 overflow-auto">
               {shares?.map((share) => (
-                <li
-                  key={share.id}
-                  className="flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
+                <li key={share.id} className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-xs font-semibold text-[#315bee]">
+                    {(share.user.name || share.user.email)
+                      .charAt(0)
+                      .toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">
                       {share.user.name || share.user.email}
                     </p>
-                    <p className="truncate text-xs text-slate-500">
-                      {share.user.email} ·{" "}
+                    <p className="mt-0.5 truncate text-[11px] text-[#626977]">
+                      {share.user.email}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-[#626977]">
                       {share.permission === "VIEW" ? "Can view" : "Can edit"}
                     </p>
                   </div>
@@ -213,7 +268,7 @@ export function ShareDialog({
                     onClick={() =>
                       void changeAccess("DELETE", share.user.email)
                     }
-                    className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="min-h-11 shrink-0 rounded-lg px-2 text-[11px] font-medium text-[#626977] transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-2 focus-visible:outline-[#315bee] disabled:opacity-50"
                   >
                     Remove
                   </button>
@@ -222,26 +277,26 @@ export function ShareDialog({
             </ul>
           )}
         </div>
-        <div className="mt-6 flex items-center justify-between gap-3 border-t pt-5">
-          <span className="flex items-center gap-2 text-xs text-slate-500">
-            <LockKeyhole size={14} /> Restricted to people with access
-          </span>
-          <button
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(window.location.href);
-                addToast("Document link copied.", "success");
-              } catch {
-                setError(
-                  "Couldn’t copy the link. Copy the address from your browser instead.",
-                );
-              }
-            }}
-            className="flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium hover:bg-slate-50"
-          >
-            <Copy size={14} /> Copy link
-          </button>
-        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e6e8ef] bg-[#fafbfe] px-6 py-4 sm:px-8">
+        <span className="flex items-center gap-2 text-[11px] text-[#626977]">
+          <LockKeyhole size={13} /> Only people with access can open
+        </span>
+        <button
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(window.location.href);
+              addToast("Document link copied.", "success");
+            } catch {
+              setError(
+                "Couldn’t copy the link. Copy the address from your browser instead.",
+              );
+            }
+          }}
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-[#e0e3ec] bg-white px-3 text-xs font-medium text-[#353b49] transition-colors hover:border-[#315bee] hover:text-[#315bee] focus-visible:outline-2 focus-visible:outline-[#315bee]"
+        >
+          <Copy size={14} /> Copy link
+        </button>
       </div>
     </dialog>
   );

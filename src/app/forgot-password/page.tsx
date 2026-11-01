@@ -1,54 +1,64 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, KeyRound, PenLine } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, KeyRound } from "lucide-react";
+import { BrandLogo } from "@/components/ui/brand";
 
 export default function ForgotPasswordPage() {
   return (
-    <main className="flex min-h-screen flex-col bg-[#faf9f6] px-6 py-8 text-[#162333]">
-      <Link
-        href="/"
-        className="mx-auto flex items-center gap-2.5 text-lg font-semibold"
-      >
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#162333] text-white">
-          <PenLine className="h-5 w-5" />
-        </span>
-        Collab Editor
-      </Link>
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-14">
-        <span className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-[#d5e2d8] bg-[#edf3ed] text-[#167d72]">
-          <KeyRound className="h-6 w-6" strokeWidth={1.5} />
-        </span>
-        <h1
-          className="text-3xl tracking-tight"
-          style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-        >
-          Let’s get you back in.
-        </h1>
-        <p className="mt-4 text-sm leading-7 text-[#63707a]">
-          If you registered with Google or GitHub, return to sign in and choose
-          that same provider. You don’t need a separate Collab Editor password.
+    <main className="flex min-h-screen flex-col bg-[#f6f7fb] text-[#191b23]">
+      <header className="border-b border-[#e6e8ef] bg-white px-6 py-6 sm:px-10">
+        <Link href="/" aria-label="Collab Editor home" className="inline-block">
+          <BrandLogo />
+        </Link>
+      </header>
+      <div className="mx-auto flex w-full max-w-[480px] flex-1 flex-col justify-center px-6 py-14">
+        <div className="mb-7 flex h-12 w-12 items-center justify-center rounded-xl border border-[#dce3ff] bg-[#eaf0ff] text-[#315BEE]">
+          <KeyRound size={22} strokeWidth={1.6} />
+        </div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#686e7c]">
+          A little help getting back
         </p>
-        <div className="my-6 rounded-xl border border-[#e0e5dd] bg-white p-5">
-          <h2 className="text-sm font-semibold">
-            Forgot an email account password?
-          </h2>
-          <p className="mt-2 text-sm leading-7 text-[#63707a]">
-            Password reset emails aren’t available yet. Contact the person who
-            runs this workspace for help recovering access.
-          </p>
+        <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.045em] sm:text-[40px]">
+          Let’s find your way in.
+        </h1>
+        <p className="mt-4 text-sm leading-7 text-[#686e7c]">
+          Use the same sign-in method you chose when you created your account.
+        </p>
+        <div className="my-8 divide-y divide-[#e6e8ef] rounded-xl border border-[#e6e8ef] bg-white px-5 sm:px-6">
+          <div className="py-5">
+            <h2 className="text-sm font-semibold">
+              Signed up with Google or GitHub?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#686e7c]">
+              Choose that provider on the sign-in page. You don’t need a
+              separate Collab Editor password.
+            </p>
+          </div>
+          <div className="py-5">
+            <h2 className="text-sm font-semibold">
+              Forgot your account password?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#686e7c]">
+              Password reset emails aren’t available yet. Contact the person who
+              runs this workspace for help recovering access.
+            </p>
+          </div>
         </div>
         <Link
           href="/login"
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#167d72] px-5 py-3.5 text-sm font-semibold text-white hover:bg-[#10665d]"
+          className="inline-flex items-center justify-center gap-2.5 rounded-lg bg-[#315BEE] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2449ce]"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to sign in
+          <ArrowLeft size={15} /> Back to sign in
         </Link>
         <Link
           href="/demo"
-          className="mt-5 inline-flex items-center justify-center gap-2 text-xs font-medium text-[#63707a] hover:text-[#167d72]"
+          className="mt-5 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-[#686e7c] hover:text-[#315BEE]"
         >
-          Keep writing in a local draft <ArrowRight className="h-3.5 w-3.5" />
+          Keep writing in a local draft <ArrowUpRight size={13} />
         </Link>
       </div>
+      <p className="px-6 pb-7 text-center text-[10px] text-[#686e7c]">
+        A little more room for your ideas.
+      </p>
     </main>
   );
 }

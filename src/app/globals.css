@@ -1,19 +1,19 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-/* Modern Design System */
+/* Collab studio: one palette across navigation, writing and account flows. */
 :root {
   /* Colors - Primary */
-  --primary-50: #f0f9ff;
-  --primary-100: #e0f2fe;
-  --primary-200: #bae6fd;
-  --primary-300: #7dd3fc;
-  --primary-400: #38bdf8;
-  --primary-500: #0ea5e9;
-  --primary-600: #0284c7;
-  --primary-700: #0369a1;
-  --primary-800: #075985;
-  --primary-900: #0c4a6e;
+  --primary-50: #f1f4ff;
+  --primary-100: #e7edff;
+  --primary-200: #cbd8ff;
+  --primary-300: #a4bbff;
+  --primary-400: #7395ff;
+  --primary-500: #4c74f7;
+  --primary-600: #315bee;
+  --primary-700: #2549cc;
+  --primary-800: #203ea5;
+  --primary-900: #203779;
 
   /* Colors - Neutral */
   --gray-50: #f9fafb;
@@ -45,12 +45,12 @@
 
   /* Semantic Colors */
   --background: #ffffff;
-  --foreground: #111827;
+  --foreground: #171923;
   --muted: #f3f4f6;
   --muted-foreground: #6b7280;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #0ea5e9;
+  --border: #e6e8ef;
+  --input: #e6e8ef;
+  --ring: #4c74f7;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -82,13 +82,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
-* {
-  border-color: var(--border);
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  letter-spacing: -0.012em;
   font-family:
     var(--font-sans),
     system-ui,
@@ -450,10 +453,10 @@ body {
   padding: 0;
 }
 
-/* Shared workspace polish */
+/* Writing canvas */
 :root {
-  --foreground: #162333;
-  --ring: #167d72;
+  --foreground: #171923;
+  --ring: #315bee;
 }
 html {
   scroll-behavior: smooth;
@@ -470,23 +473,23 @@ summary {
   cursor: pointer;
 }
 :where(a, button, input, select, summary, textarea):focus-visible {
-  outline: 2px solid #167d72;
+  outline: 2px solid #315bee;
   outline-offset: 3px;
 }
 .editor-prose {
   padding: 28px 64px 72px;
   min-height: 520px;
-  color: #475569;
-  font-size: 15px;
-  line-height: 1.9;
+  color: #4c5261;
+  font-size: 16px;
+  line-height: 1.85;
   overflow-wrap: anywhere;
 }
 .editor-prose h1,
 .editor-prose h2,
 .editor-prose h3 {
-  color: #162333;
+  color: #171923;
   letter-spacing: -0.025em;
-  scroll-margin-top: 150px;
+  scroll-margin-top: 160px;
 }
 .editor-prose h1 {
   font-size: 1.9rem;
@@ -499,19 +502,19 @@ summary {
   font-size: 1.1rem;
 }
 .editor-prose blockquote {
-  border-color: #167d72;
-  background: #f4f8f6;
+  border-color: #315bee;
+  background: #f6f7ff;
   padding: 2px 20px;
-  color: #496b62;
+  color: #545c72;
 }
 .editor-prose a {
-  color: #167d72;
+  color: #315bee;
   text-decoration: underline;
 }
 .editor-prose li p {
   margin: 0;
 }
-.editor-prose p:first-child {
+.editor-prose > :first-child {
   margin-top: 0;
 }
 .editor-prose > :last-child {
@@ -528,6 +531,11 @@ summary {
   max-width: min(420px, calc(100vw - 2rem));
 }
 @media (max-width: 640px) {
+  .editor-prose h1,
+  .editor-prose h2,
+  .editor-prose h3 {
+    scroll-margin-top: 230px;
+  }
   .editor-prose {
     padding: 24px 24px 48px;
     min-height: 400px;
@@ -544,4 +552,35 @@ summary {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Selection stays legible on the page and in the workspace. */
+::selection {
+  background: #dce5ff;
+  color: #171923;
+}
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+.toast {
+  background: #fff;
+  border-color: #e6e8ef;
+  color: #171923;
+  box-shadow: 0 12px 40px -12px #17192333;
+}
+.toast-success > svg {
+  color: #168366;
+}
+.toast-error > svg {
+  color: #dc2626;
+}
+.toast-warning > svg {
+  color: #b45309;
+}
+.toast-info > svg {
+  color: #315bee;
 }

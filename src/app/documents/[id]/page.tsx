@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Check,
   CloudOff,
-  Feather,
   Loader2,
   LockKeyhole,
   RefreshCw,
@@ -16,6 +15,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { BrandLogo } from "@/components/ui/brand";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
 import { ShareDialog } from "@/components/editor/share-dialog";
 import { useSocket } from "@/lib/socket/use-socket";
@@ -116,12 +116,13 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
     [],
   );
 
-  const { connected, users, sendUpdate, connectionError, reconnect } = useSocket({
-    documentId: id,
-    user: { id: session?.user?.id || "", name: session?.user?.name || "You" },
-    enabled: Boolean(record && session?.user?.id),
-    onDocumentUpdate: handleRemoteContent,
-  });
+  const { connected, users, sendUpdate, connectionError, reconnect } =
+    useSocket({
+      documentId: id,
+      user: { id: session?.user?.id || "", name: session?.user?.name || "You" },
+      enabled: Boolean(record && session?.user?.id),
+      onDocumentUpdate: handleRemoteContent,
+    });
 
   useEffect(() => {
     if (sessionStatus === "unauthenticated")
@@ -187,7 +188,9 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
         setRecord(data);
         setLoadError("");
         setRecoveryNotice(
-          hasPendingDraft ? "Recovered your unsaved changes from this tab." : "",
+          hasPendingDraft
+            ? "Recovered your unsaved changes from this tab."
+            : "",
         );
         setSaveError(
           nextStatus === "conflict"
@@ -295,7 +298,7 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
       if (!controller.signal.aborted && generation === generationRef.current) {
         const conflict = Boolean(
           pendingRemoteRef.current &&
-          pendingRemoteRef.current.updatedAt > revisionRef.current,
+            pendingRemoteRef.current.updatedAt > revisionRef.current,
         );
         statusRef.current = conflict ? "conflict" : "error";
         setSaveStatus(statusRef.current);
@@ -380,16 +383,16 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
 
   if (loading)
     return (
-      <div className="flex min-h-screen items-center justify-center gap-3 bg-[#f7f8fa] text-sm text-slate-500">
-        <Loader2 size={20} className="animate-spin text-teal-700" /> Opening
+      <div className="flex min-h-screen items-center justify-center gap-3 bg-[#f6f7fb] text-sm text-slate-500">
+        <Loader2 size={20} className="animate-spin text-[#315bee]" /> Opening
         your document…
       </div>
     );
   if (loadError)
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] p-6">
+      <main className="flex min-h-screen items-center justify-center bg-[#f6f7fb] p-6">
         <div className="max-w-md text-center">
-          <CloudOff className="mx-auto mb-5 text-teal-700" size={36} />
+          <CloudOff className="mx-auto mb-5 text-[#315bee]" size={36} />
           <h1 className="text-2xl font-semibold">
             Let’s get you back to writing.
           </h1>
@@ -399,13 +402,13 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
           <div className="flex justify-center gap-3">
             <Link
               href="/documents"
-              className="rounded-lg border bg-white px-4 py-2 text-sm"
+              className="min-h-11 rounded-xl border border-[#e6e8ef] bg-white px-4 py-3 text-sm"
             >
               All documents
             </Link>
             <button
               onClick={() => setReloadCount((count) => count + 1)}
-              className="rounded-lg bg-teal-700 px-4 py-2 text-sm text-white"
+              className="min-h-11 rounded-xl bg-[#315bee] px-4 py-3 text-sm font-medium text-white"
             >
               Try again
             </button>
@@ -415,8 +418,8 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
     );
   if (!record)
     return (
-      <div className="flex min-h-screen items-center justify-center gap-3 bg-[#f7f8fa] text-sm text-slate-500">
-        <Loader2 size={20} className="animate-spin text-teal-700" /> Opening
+      <div className="flex min-h-screen items-center justify-center gap-3 bg-[#f6f7fb] text-sm text-slate-500">
+        <Loader2 size={20} className="animate-spin text-[#315bee]" /> Opening
         your document…
       </div>
     );
@@ -433,36 +436,43 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
   const liveConnected = connected && !connectionError;
 
   return (
-    <div className="min-h-screen bg-[#f5f6f7]">
-      <header className="sticky top-0 z-30 h-[73px] border-b bg-white">
-        <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
-          <div className="flex min-w-0 items-center gap-4">
+    <div className="min-h-screen bg-[#f6f7fb] text-[#171923]">
+      <header className="sticky top-0 z-30 h-16 border-b border-[#e6e8ef] bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-3 px-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             <button
               onClick={leave}
               aria-label="Back to documents"
-              className="rounded-md p-2 text-slate-400 hover:bg-slate-50"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#626977] transition-colors hover:bg-[#f6f7fb] hover:text-[#171923] focus-visible:outline-2 focus-visible:outline-[#315bee]"
             >
               <ArrowLeft size={18} />
             </button>
-            <span className="hidden items-center gap-2 font-semibold tracking-tight text-[#162333] sm:flex">
-              <Feather size={22} className="text-teal-700" /> collab
-              <span className="text-teal-700">.</span>
+            <span className="hidden md:block">
+              <BrandLogo compact />
             </span>
-            <span className="hidden h-5 w-px bg-slate-200 sm:block" />
-            <span className="max-w-[150px] truncate text-sm text-slate-600 sm:max-w-xs">
-              {draft.title || "Untitled document"}
-            </span>
+            <span
+              aria-hidden="true"
+              className="hidden h-6 w-px bg-[#e6e8ef] md:block"
+            />
+            <div className="min-w-0">
+              <p className="mb-0.5 hidden text-[10px] font-medium uppercase tracking-[.1em] text-[#626977] sm:block">
+                {record.isOwner ? "My workspace" : "Shared with me"}
+              </p>
+              <p className="max-w-[42vw] truncate text-[13px] font-medium text-[#353b49] sm:max-w-xs lg:max-w-md">
+                {draft.title || "Untitled document"}
+              </p>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-3 sm:gap-5">
             <span
               role="status"
               aria-live="polite"
-              className={`hidden items-center gap-1.5 text-xs sm:flex ${saveStatus === "error" || saveStatus === "conflict" ? "text-amber-700" : "text-slate-500"}`}
+              className={`hidden items-center gap-1.5 text-[11px] lg:flex ${saveStatus === "error" || saveStatus === "conflict" ? "text-amber-700" : "text-[#626977]"}`}
             >
               {saveStatus === "saving" ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : saveStatus === "saved" ? (
-                <Check size={14} className="text-teal-700" />
+                <Check size={14} className="text-[#315bee]" />
               ) : (
                 <CloudOff size={14} />
               )}
@@ -476,17 +486,22 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
                 <span
                   key={user.id}
                   title={user.name}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-medium text-white"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-semibold text-white ring-1 ring-black/5"
                   style={{ backgroundColor: user.color }}
                 >
                   {user.name.charAt(0).toUpperCase()}
                 </span>
               ))}
+              {users.length > 3 && (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[#eef2ff] text-[10px] font-semibold text-[#315bee]">
+                  +{users.length - 3}
+                </span>
+              )}
             </div>
             {record.isOwner && (
               <button
                 onClick={() => setSharing(true)}
-                className="flex items-center gap-2 rounded-lg bg-[#167d72] px-4 py-2.5 text-xs font-medium text-white hover:bg-[#12695f]"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-[#315bee] px-4 text-xs font-semibold text-white shadow-[0_2px_6px_#315bee25] transition-colors hover:bg-[#244bd5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#315bee]"
               >
                 <Share2 size={14} /> Share
               </button>
@@ -494,19 +509,21 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
           </div>
         </div>
       </header>
-      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-2 px-6 py-5 text-xs text-slate-500">
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 text-[11px] text-[#626977] sm:px-8">
         <span className="flex items-center gap-2">
-          <LockKeyhole size={13} />{" "}
-          {record.isOwner ? "Your workspace" : "Shared with you"}{" "}
-          <span className="mx-1 text-slate-300">/</span>{" "}
-          {record.canEdit ? "Editing" : "Viewing"}
+          <LockKeyhole size={13} />
+          <span>{record.isOwner ? "Your document" : "Shared document"}</span>
+          <span aria-hidden="true" className="text-[#c3c7d0]">
+            /
+          </span>
+          <span className="font-medium text-[#4c5261]">
+            {record.canEdit ? "Editing" : "Viewing"}
+          </span>
         </span>
-        <span className="flex items-center gap-1.5">
-          {liveConnected ? (
-            <Wifi size={14} className="text-teal-700" />
-          ) : (
-            <WifiOff size={14} />
-          )}
+        <span
+          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${liveConnected ? "border-[#dfe6ff] bg-[#eef2ff] text-[#315bee]" : "border-[#e6e8ef] bg-white text-[#626977]"}`}
+        >
+          {liveConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
           {liveConnected
             ? "Live collaboration connected"
             : "Live collaboration unavailable"}
@@ -514,12 +531,12 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
         <span
           role="status"
           aria-live="polite"
-          className={`flex w-full items-center gap-1.5 sm:hidden ${saveStatus === "error" || saveStatus === "conflict" ? "text-amber-700" : "text-slate-500"}`}
+          className={`flex w-full items-center gap-1.5 lg:hidden ${saveStatus === "error" || saveStatus === "conflict" ? "text-amber-700" : "text-[#626977]"}`}
         >
           {saveStatus === "saving" ? (
             <Loader2 size={13} className="animate-spin" />
           ) : saveStatus === "saved" ? (
-            <Check size={13} className="text-teal-700" />
+            <Check size={13} className="text-[#315bee]" />
           ) : (
             <CloudOff size={13} />
           )}
@@ -529,12 +546,12 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
       {connectionError && (
         <div
           role="status"
-          className="mx-auto mb-4 flex max-w-4xl flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="mx-4 mb-4 flex max-w-4xl sm:mx-auto flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
         >
           <p className="flex-1">{connectionError}</p>
           <button
             onClick={reconnect}
-            className="rounded-md border border-amber-300 px-3 py-2 text-xs font-semibold"
+            className="min-h-11 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold"
           >
             Reconnect
           </button>
@@ -543,7 +560,7 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
       {recoveryNotice && (
         <p
           role="status"
-          className="mx-auto mb-4 max-w-4xl rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-900"
+          className="mx-4 mb-4 max-w-4xl sm:mx-auto rounded-lg border border-[#dfe6ff] bg-[#eef2ff] px-4 py-3 text-sm text-[#315bee]"
         >
           {recoveryNotice}
         </p>
@@ -551,16 +568,16 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
       {recoveryUnavailable && saveStatus !== "saved" && (
         <p
           role="alert"
-          className="mx-auto mb-4 max-w-4xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="mx-4 mb-4 max-w-4xl sm:mx-auto rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
         >
-          Browser recovery is unavailable. Keep this page open until your changes
-          are saved, or download your draft.
+          Browser recovery is unavailable. Keep this page open until your
+          changes are saved, or download your draft.
         </p>
       )}
       {saveError && (
         <div
           role="alert"
-          className="mx-auto mb-5 flex max-w-4xl flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="mx-4 mb-5 flex max-w-4xl sm:mx-auto flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
         >
           <p className="flex-1">{saveError}</p>
           <button
@@ -568,7 +585,7 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
             onClick={
               saveStatus === "conflict" ? reloadLatest : () => void save()
             }
-            className="flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+            className="flex items-center gap-2 min-h-11 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold disabled:opacity-50"
           >
             <RefreshCw size={13} />
             {saveStatus === "conflict" ? "Load latest version" : "Retry save"}

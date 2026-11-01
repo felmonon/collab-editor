@@ -59,19 +59,19 @@ export function DocumentActions({
         aria-expanded={open}
         aria-controls={`document-actions-${id}`}
         onClick={() => setOpen((value) => !value)}
-        className="focus-ring flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#162333]"
+        className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-[#747c8c] transition-colors hover:bg-[#edf1ff] hover:text-[#315bee]"
       >
-        <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+        <MoreHorizontal className="h-[18px] w-[18px]" aria-hidden="true" />
       </button>
       {open && (
         <div
           id={`document-actions-${id}`}
-          className="absolute right-0 top-11 z-20 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg"
+          className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-[#e6e8ef] bg-white p-1.5 shadow-[0_10px_30px_-8px_#17192326]"
         >
           <Link
             ref={firstAction}
             href={`/documents/${id}`}
-            className="focus-ring flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+            className="focus-ring flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] text-[#697184] hover:bg-[#f3f5fb]"
           >
             <ArrowUpRight className="h-4 w-4" aria-hidden="true" /> Open
             document
@@ -84,7 +84,7 @@ export function DocumentActions({
                 trigger.current?.focus();
                 onDelete();
               }}
-              className="focus-ring flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-red-700 hover:bg-red-50"
+              className="focus-ring flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[12px] text-[#bf555f] hover:bg-[#fff1f2]"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" /> Delete document
             </button>

@@ -12,10 +12,17 @@ import {
   FileText,
   Loader2,
   MousePointer2,
+  RefreshCw,
 } from "lucide-react";
 import { OAuthButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandLogo } from "@/components/ui/brand";
+import {
+  oauthErrorMessage,
+  socialProviderIds,
+  socialProviderNames,
+  type SocialProviderId,
+} from "@/lib/auth-providers";
 
 type FormData = {
   name: string;
@@ -53,10 +60,17 @@ function LoginContent() {
   const formRef = useRef<HTMLFormElement>(null);
   const [isLogin, setIsLogin] = useState(searchParams.get("mode") !== "signup");
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(
+  const [oauthLoading, setOauthLoading] = useState<SocialProviderId | null>(
     null,
   );
-  const [providers, setProviders] = useState<string[]>([]);
+  const [providerDiscovery, setProviderDiscovery] = useState<{
+    status: "loading" | "ready" | "error";
+    providers: SocialProviderId[];
+  }>({ status: "loading", providers: [] });
+  const [providerAttempt, setProviderAttempt] = useState(0);
+  const [dismissedCallbackError, setDismissedCallbackError] = useState<
+    string | null
+  >(null);
   const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
@@ -74,25 +88,38 @@ function LoginContent() {
       : "/documents";
   const callbackError = searchParams.get("error");
   const oauthError =
-    callbackError === "OAuthAccountNotLinked"
-      ? "This email already uses a different sign-in method. Please use the method you originally registered with."
-      : callbackError
-        ? "We couldn’t complete sign in. Please try again or use your email and password."
-        : "";
+    callbackError && callbackError !== dismissedCallbackError
+      ? oauthErrorMessage(callbackError)
+      : "";
 
   useEffect(() => {
     let active = true;
+    const timeout = window.setTimeout(() => {
+      if (!active) return;
+      active = false;
+      setProviderDiscovery({ status: "error", providers: [] });
+    }, 10000);
     getProviders()
       .then((available) => {
-        if (active) setProviders(Object.keys(available || {}));
+        // NextAuth returns null on a discovery failure instead of always throwing.
+        if (!available) throw new Error("Provider discovery unavailable");
+        if (active)
+          setProviderDiscovery({
+            status: "ready",
+            providers: socialProviderIds.filter(
+              (provider) => available[provider]?.type === "oauth",
+            ),
+          });
       })
       .catch(() => {
-        /* Email sign-in remains available if provider discovery fails. */
-      });
+        if (active) setProviderDiscovery({ status: "error", providers: [] });
+      })
+      .finally(() => window.clearTimeout(timeout));
     return () => {
       active = false;
+      window.clearTimeout(timeout);
     };
-  }, []);
+  }, [providerAttempt]);
 
   useEffect(() => {
     if (status === "authenticated") router.replace(callbackUrl);
@@ -142,6 +169,7 @@ function LoginContent() {
     event.preventDefault();
     if (busy || !validateForm()) return;
     setLoading(true);
+    setDismissedCallbackError(callbackError);
     setFormError("");
     setNotice("");
     const email = formData.email.trim().toLowerCase();
@@ -203,16 +231,31 @@ function LoginContent() {
     }
   }
 
-  async function handleOAuth(provider: "google" | "github") {
-    if (busy) return;
+  async function handleOAuth(provider: SocialProviderId) {
+    if (busy || !providerDiscovery.providers.includes(provider)) return;
     setOauthLoading(provider);
+    setDismissedCallbackError(callbackError);
     setFormError("");
+    setNotice("");
+    const failureMessage = `We couldn’t connect to ${socialProviderNames[provider]}. Please try again, or use your email and password.`;
     try {
-      await signIn(provider, { callbackUrl });
+      // OAuth uses NextAuth's redirect flow, including its CSRF and state checks.
+      // v4 normally returns undefined after starting navigation; callback errors
+      // return in the URL. Also handle an explicit failure response if supplied.
+      const result: unknown = await signIn(provider, { callbackUrl });
+      if (result && typeof result === "object") {
+        if (
+          "error" in result &&
+          typeof result.error === "string" &&
+          result.error
+        ) {
+          setFormError(oauthErrorMessage(result.error));
+        } else if ("ok" in result && result.ok === false) {
+          setFormError(failureMessage);
+        }
+      }
     } catch {
-      setFormError(
-        `We couldn’t connect to ${provider === "google" ? "Google" : "GitHub"}. Please try again.`,
-      );
+      setFormError(failureMessage);
     } finally {
       setOauthLoading(null);
     }
@@ -327,26 +370,62 @@ function LoginContent() {
                 : "Create an account. Give your ideas a home."}
             </p>
           </div>
-          {providers.some(
-            (provider) => provider === "google" || provider === "github",
-          ) && (
+          {providerDiscovery.status === "loading" && (
+            <p
+              role="status"
+              className="mb-5 flex items-center gap-2 text-xs text-[#686e7c]"
+            >
+              <Loader2 size={14} className="animate-spin" aria-hidden="true" />{" "}
+              Checking sign-in options…
+            </p>
+          )}
+          {providerDiscovery.status === "error" && (
+            <div
+              role="alert"
+              className="mb-5 rounded-lg border border-[#e1e5ef] bg-[#f6f7fb] px-4 py-3 text-xs leading-6 text-[#626977]"
+            >
+              <p>
+                Social sign-in options couldn’t load. You can still use your
+                email below.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setProviderDiscovery({ status: "loading", providers: [] });
+                  setProviderAttempt((attempt) => attempt + 1);
+                }}
+                className="mt-2 inline-flex items-center gap-1.5 rounded text-xs font-semibold text-[#315BEE] hover:underline disabled:opacity-50"
+              >
+                <RefreshCw size={12} aria-hidden="true" /> Retry sign-in options
+              </button>
+            </div>
+          )}
+          {providerDiscovery.providers.length > 0 && (
             <>
-              <div className="mb-6 space-y-2.5">
-                {(["google", "github"] as const)
-                  .filter((provider) => providers.includes(provider))
-                  .map((provider) => (
-                    <OAuthButton
-                      key={provider}
-                      type="button"
-                      provider={provider}
-                      size="md"
-                      onClick={() => handleOAuth(provider)}
-                      loading={oauthLoading === provider}
-                      disabled={busy}
-                    />
-                  ))}
+              <div
+                role="group"
+                aria-label="Continue with a social account"
+                className="space-y-2.5"
+              >
+                {providerDiscovery.providers.map((provider) => (
+                  <OAuthButton
+                    key={provider}
+                    type="button"
+                    provider={provider}
+                    size="md"
+                    onClick={() => handleOAuth(provider)}
+                    loading={oauthLoading === provider}
+                    disabled={busy}
+                  />
+                ))}
               </div>
-              <div className="mb-6 flex items-center gap-4 text-[10px] text-[#686e7c]">
+              <p className="mt-3 text-center text-[11px] leading-5 text-[#686e7c]">
+                {isLogin
+                  ? "Use the same sign-in method you chose before."
+                  : "First time here? Your chosen provider creates your account. Already joined? It signs you in."}
+              </p>
+              <div className="my-6 flex items-center gap-4 text-[10px] text-[#686e7c]">
                 <span className="h-px flex-1 bg-[#e6e8ef]" />
                 or continue with email
                 <span className="h-px flex-1 bg-[#e6e8ef]" />
@@ -483,8 +562,14 @@ function LoginContent() {
             </Link>
           </div>
         </div>
-        <p className="text-center text-[10px] text-[#686e7c]">
-          A little more room for your ideas.
+        <p className="text-center text-[11px] text-[#686e7c]">
+          A little more room for your ideas. <span aria-hidden="true">·</span>{" "}
+          <Link
+            href="/privacy"
+            className="underline underline-offset-4 hover:text-[#315BEE]"
+          >
+            Privacy
+          </Link>
         </p>
       </div>
     </main>

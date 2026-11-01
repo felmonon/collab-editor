@@ -2,6 +2,10 @@
 
 import { forwardRef, ButtonHTMLAttributes, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+import {
+  socialProviderNames,
+  type SocialProviderId,
+} from "@/lib/auth-providers";
 
 type ButtonVariant =
   | "primary"
@@ -16,6 +20,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
+  loadingLabel?: string;
   icon?: ReactNode;
   iconPosition?: "left" | "right";
   fullWidth?: boolean;
@@ -76,6 +81,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       variant = "primary",
       size = "md",
       loading = false,
+      loadingLabel = "Please wait...",
       icon,
       iconPosition = "left",
       fullWidth = false,
@@ -106,8 +112,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Please wait...</span>
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            <span>{loadingLabel}</span>
           </>
         ) : (
           <>
@@ -123,13 +129,18 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
 Button.displayName = "Button";
 
-// Social OAuth Buttons with proper branding
+// Equal prominence for every configured social sign-in option.
 interface OAuthButtonProps extends Omit<ButtonProps, "variant" | "icon"> {
-  provider: "google" | "github";
+  provider: SocialProviderId;
 }
 
 const GoogleIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24">
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    focusable="false"
+  >
     <path
       fill="#4285F4"
       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -150,7 +161,13 @@ const GoogleIcon = ({ className }: { className?: string }) => (
 );
 
 const GitHubIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+  <svg
+    className={className}
+    fill="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    focusable="false"
+  >
     <path
       fillRule="evenodd"
       clipRule="evenodd"
@@ -159,13 +176,34 @@ const GitHubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const AppleIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.76 3.08.82 1.18-.24 2.31-.94 3.57-.85 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.08l.01-.01ZM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25Z" />
+  </svg>
+);
+
+const providerIcons = {
+  google: GoogleIcon,
+  apple: AppleIcon,
+  github: GitHubIcon,
+};
+
 export function OAuthButton({
   provider,
   size = "lg",
   fullWidth = true,
   loading,
+  className = "",
   ...props
 }: OAuthButtonProps) {
+  const Icon = providerIcons[provider];
+  const name = socialProviderNames[provider];
   return (
     <Button
       {...props}
@@ -173,15 +211,12 @@ export function OAuthButton({
       size={size}
       fullWidth={fullWidth}
       loading={loading}
-      icon={
-        provider === "github" ? (
-          <GitHubIcon className="w-5 h-5" />
-        ) : (
-          <GoogleIcon className="w-5 h-5" />
-        )
-      }
+      loadingLabel={`Connecting to ${name}…`}
+      aria-busy={loading || undefined}
+      className={`min-h-11 ${className}`}
+      icon={<Icon className="h-[18px] w-[18px] shrink-0" />}
     >
-      Continue with {provider === "github" ? "GitHub" : "Google"}
+      Continue with {name}
     </Button>
   );
 }

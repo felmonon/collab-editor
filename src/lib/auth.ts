@@ -1,11 +1,9 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { NextAuthOptions } from "next-auth";
-import GithubProvider from "next-auth/providers/github";
-import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
-import { requestGithubToken } from "./github-oauth";
+import { appleCookies, socialProviders } from "./social-oauth";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -51,26 +49,7 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
-      ? [
-          GithubProvider({
-            clientId: process.env.GITHUB_ID,
-            clientSecret: process.env.GITHUB_SECRET,
-            token: {
-              url: "https://github.com/login/oauth/access_token",
-              request: requestGithubToken,
-            },
-          }),
-        ]
-      : []),
-    ...(process.env.GOOGLE_ID && process.env.GOOGLE_SECRET
-      ? [
-          GoogleProvider({
-            clientId: process.env.GOOGLE_ID,
-            clientSecret: process.env.GOOGLE_SECRET,
-          }),
-        ]
-      : []),
+    ...socialProviders(process.env),
   ],
   session: {
     strategy: "jwt",
@@ -93,3 +72,20 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
 };
+
+// Request-local options avoid leaking one Apple callback's display name into
+// another user's request. The shared options remain suitable for session reads.
+export function authOptionsForProvider(
+  providerId?: string,
+  appleName?: string,
+): NextAuthOptions {
+  if (providerId !== "apple") return authOptions;
+  return {
+    ...authOptions,
+    providers: [
+      authOptions.providers[0],
+      ...socialProviders(process.env, appleName),
+    ],
+    cookies: appleCookies(process.env, providerId),
+  };
+}

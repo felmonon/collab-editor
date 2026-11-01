@@ -25,6 +25,7 @@ import {
   type SavedEditorDraft,
 } from "@/lib/editor-save";
 import { draftRecovery, reconcileRecoveredDraft } from "@/lib/editor-recovery";
+import { recoverExpiredSession } from "@/lib/auth-session-client";
 
 interface DocumentRecord {
   id: string;
@@ -145,6 +146,12 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
         const res = await fetch(`/api/documents/${id}`, {
           signal: controller.signal,
         });
+        if (controller.signal.aborted || generation !== generationRef.current)
+          return;
+        if (res.status === 401) {
+          await recoverExpiredSession(`/documents/${id}`);
+          return;
+        }
         if (!res.ok)
           throw new Error(
             res.status === 404
@@ -252,6 +259,17 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
           expectedUpdatedAt: revisionRef.current,
         }),
       });
+      if (controller.signal.aborted || generation !== generationRef.current)
+        return;
+      if (res.status === 401) {
+        statusRef.current = "error";
+        setSaveStatus("error");
+        setSaveError(
+          "Your session expired. Your draft is still here. Retry saving to sign in again, or download a copy.",
+        );
+        await recoverExpiredSession(`/documents/${id}`);
+        return;
+      }
       const data = await res.json();
       if (controller.signal.aborted || generation !== generationRef.current)
         return;

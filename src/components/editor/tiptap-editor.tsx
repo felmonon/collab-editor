@@ -26,6 +26,10 @@ import {
   Minus,
 } from "lucide-react";
 import { downloadDocument, documentMarkdown } from "@/lib/editor-document";
+import {
+  editorActionAvailability,
+  syncExternalEditorContent,
+} from "@/lib/editor-controls";
 
 interface TiptapEditorProps {
   content: string;
@@ -37,7 +41,7 @@ interface TiptapEditorProps {
 
 function MenuButton({
   onClick,
-  active = false,
+  active,
   disabled = false,
   label,
   expanded,
@@ -154,13 +158,14 @@ function EditorSurface({
         words: text.trim() ? text.trim().split(/\s+/u).length : 0,
         characters: text.length,
         headings,
+        available: editorActionAvailability(editor),
       };
     },
   });
 
   useEffect(() => {
     if (editor && content !== editor.getHTML())
-      editor.commands.setContent(content || "<p></p>", { emitUpdate: false });
+      syncExternalEditorContent(editor, content || "<p></p>");
   }, [content, editor]);
   useEffect(() => {
     editor?.setEditable(editable, false);
@@ -242,10 +247,10 @@ function EditorSurface({
                   else editor.chain().focus().toggleHeading({ level }).run();
                 }}
               >
-                <option value={0}>Normal text</option>
-                <option value={1}>Heading 1</option>
-                <option value={2}>Heading 2</option>
-                <option value={3}>Heading 3</option>
+                <option value={0} disabled={!state.available.paragraph}>Normal text</option>
+                <option value={1} disabled={!state.available.heading1}>Heading 1</option>
+                <option value={2} disabled={!state.available.heading2}>Heading 2</option>
+                <option value={3} disabled={!state.available.heading3}>Heading 3</option>
               </select>
               <span
                 aria-hidden="true"
@@ -259,6 +264,7 @@ function EditorSurface({
                 <MenuButton
                   label="Bold (⌘/Ctrl B)"
                   active={state.bold}
+                  disabled={!state.available.bold}
                   onClick={() => editor.chain().focus().toggleBold().run()}
                 >
                   <Bold size={16} />
@@ -266,6 +272,7 @@ function EditorSurface({
                 <MenuButton
                   label="Italic (⌘/Ctrl I)"
                   active={state.italic}
+                  disabled={!state.available.italic}
                   onClick={() => editor.chain().focus().toggleItalic().run()}
                 >
                   <Italic size={16} />
@@ -273,6 +280,7 @@ function EditorSurface({
                 <MenuButton
                   label="Underline (⌘/Ctrl U)"
                   active={state.underline}
+                  disabled={!state.available.underline}
                   onClick={() => editor.chain().focus().toggleUnderline().run()}
                 >
                   <Underline size={16} />
@@ -280,6 +288,7 @@ function EditorSurface({
                 <MenuButton
                   label="Strikethrough"
                   active={state.strike}
+                  disabled={!state.available.strike}
                   onClick={() => editor.chain().focus().toggleStrike().run()}
                 >
                   <Strikethrough size={16} />
@@ -297,6 +306,7 @@ function EditorSurface({
                 <MenuButton
                   label="Bullet list"
                   active={state.bullet}
+                  disabled={!state.available.bullet}
                   onClick={() =>
                     editor.chain().focus().toggleBulletList().run()
                   }
@@ -306,6 +316,7 @@ function EditorSurface({
                 <MenuButton
                   label="Numbered list"
                   active={state.ordered}
+                  disabled={!state.available.ordered}
                   onClick={() =>
                     editor.chain().focus().toggleOrderedList().run()
                   }
@@ -315,6 +326,7 @@ function EditorSurface({
                 <MenuButton
                   label="Blockquote"
                   active={state.quote}
+                  disabled={!state.available.quote}
                   onClick={() =>
                     editor.chain().focus().toggleBlockquote().run()
                   }
@@ -324,12 +336,14 @@ function EditorSurface({
                 <MenuButton
                   label="Code block"
                   active={state.code}
+                  disabled={!state.available.code}
                   onClick={() => editor.chain().focus().toggleCodeBlock().run()}
                 >
                   <Code2 size={17} />
                 </MenuButton>
                 <MenuButton
                   label="Horizontal divider"
+                  disabled={!state.available.divider}
                   onClick={() =>
                     editor.chain().focus().setHorizontalRule().run()
                   }

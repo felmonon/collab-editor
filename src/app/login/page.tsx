@@ -88,6 +88,7 @@ function LoginContent() {
     typeof window === "undefined" ? undefined : window.location.origin,
   );
   const callbackError = searchParams.get("error");
+  const sessionExpired = searchParams.get("reason") === "session-expired";
   const oauthError =
     callbackError && callbackError !== dismissedCallbackError
       ? oauthErrorMessage(callbackError)
@@ -123,13 +124,13 @@ function LoginContent() {
   }, [providerAttempt]);
 
   useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "authenticated" && !sessionExpired) {
       const destination = callbackUrl === "/account" && callbackError
         ? `/account?error=${encodeURIComponent(callbackError)}`
         : callbackUrl;
       router.replace(destination);
     }
-  }, [status, router, callbackUrl, callbackError]);
+  }, [status, router, callbackUrl, callbackError, sessionExpired]);
 
   function updateField(field: Field, value: string) {
     setFormData((previous) => ({ ...previous, [field]: value }));
@@ -446,12 +447,12 @@ function LoginContent() {
               {formError || oauthError}
             </p>
           )}
-          {notice && (
+          {(notice || sessionExpired) && (
             <p
               role="status"
               className="mb-5 rounded-lg border border-[#cbd6ff] bg-[#f0f3ff] px-4 py-3 text-sm leading-6 text-[#315BEE]"
             >
-              {notice}
+              {notice || "Your session expired. Sign in again to return to your work."}
             </p>
           )}
           <form

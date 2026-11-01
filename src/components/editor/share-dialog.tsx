@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Loader2, LockKeyhole, UserPlus, X } from "lucide-react";
+import { Copy, Loader2, LockKeyhole, RefreshCw, UserPlus, X } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 
 interface Share {
@@ -16,30 +16,36 @@ export function ShareDialog({
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [shares, setShares] = useState<Share[]>([]);
+  const [shares, setShares] = useState<Share[] | null>(null);
   const [email, setEmail] = useState("");
   const [permission, setPermission] = useState("EDIT");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const { addToast } = useToast();
   const load = useCallback(() => {
     return fetch(`/api/documents/${documentId}/shares`)
       .then(async (res) => {
         if (!res.ok)
           throw new Error(
-            "Couldn’t load collaborators. Close this window and try again.",
+            "We couldn’t refresh the access list. Existing access hasn’t been verified.",
           );
         return res.json();
       })
-      .then((data) => setShares(data.shares))
-      .catch((error) =>
-        setError(
+      .then((data) => {
+        if (!Array.isArray(data.shares)) throw new Error("Unable to read the access list.");
+        setShares(data.shares);
+        setLoadError("");
+      })
+      .catch((error) => {
+        setShares(null);
+        setLoadError(
           error instanceof Error
             ? error.message
             : "Unable to load sharing settings.",
-        ),
-      )
+        );
+      })
       .finally(() => setLoading(false));
   }, [documentId]);
   useEffect(() => {
@@ -47,6 +53,7 @@ export function ShareDialog({
     void load();
   }, [load]);
   async function changeAccess(method: "POST" | "DELETE", targetEmail: string) {
+    if (busy || loading) return;
     setBusy(true);
     setError("");
     try {
@@ -58,6 +65,7 @@ export function ShareDialog({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn’t update access.");
       setEmail("");
+      setLoading(true);
       await load();
       addToast(
         method === "POST"
@@ -80,7 +88,7 @@ export function ShareDialog({
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl border bg-white p-0 text-[#162333] shadow-xl backdrop:bg-slate-950/30"
+      className="fixed inset-0 m-auto w-[calc(100%_-_2rem)] max-w-lg rounded-2xl border bg-white p-0 text-[#162333] shadow-xl backdrop:bg-slate-950/30"
       aria-labelledby="share-title"
     >
       <div className="p-6 sm:p-8">
@@ -118,6 +126,7 @@ export function ShareDialog({
               id="share-email"
               type="email"
               required
+              disabled={busy || loading}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@example.com"
@@ -125,6 +134,7 @@ export function ShareDialog({
             />
             <select
               aria-label="Access level"
+              disabled={busy || loading}
               value={permission}
               onChange={(event) => setPermission(event.target.value)}
               className="rounded-lg border px-2 text-sm"
@@ -162,14 +172,29 @@ export function ShareDialog({
             People with access
           </p>
           {loading ? (
-            <p className="text-sm text-slate-500">Loading…</p>
-          ) : shares.length === 0 ? (
+            <p role="status" className="text-sm text-slate-500">Refreshing access…</p>
+          ) : loadError ? (
+            <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <p>{loadError}</p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setLoading(true);
+                  void load();
+                }}
+                className="mt-3 inline-flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                <RefreshCw size={13} /> Retry access list
+              </button>
+            </div>
+          ) : shares?.length === 0 ? (
             <p className="text-sm text-slate-500">
               Only you have access so far.
             </p>
           ) : (
             <ul className="max-h-52 space-y-4 overflow-auto">
-              {shares.map((share) => (
+              {shares?.map((share) => (
                 <li
                   key={share.id}
                   className="flex items-center justify-between gap-3"

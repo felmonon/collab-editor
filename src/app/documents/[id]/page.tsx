@@ -116,7 +116,7 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
     [],
   );
 
-  const { connected, users, sendUpdate } = useSocket({
+  const { connected, users, sendUpdate, connectionError, reconnect } = useSocket({
     documentId: id,
     user: { id: session?.user?.id || "", name: session?.user?.name || "You" },
     enabled: Boolean(record && session?.user?.id),
@@ -421,6 +421,17 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
       </div>
     );
 
+  const saveLabel = !record.canEdit
+    ? "View only"
+    : {
+        saved: "All changes saved",
+        unsaved: "Unsaved changes",
+        saving: "Saving…",
+        error: "Not saved",
+        conflict: "Review changes",
+      }[saveStatus];
+  const liveConnected = connected && !connectionError;
+
   return (
     <div className="min-h-screen bg-[#f5f6f7]">
       <header className="sticky top-0 z-30 h-[73px] border-b bg-white">
@@ -455,15 +466,7 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
               ) : (
                 <CloudOff size={14} />
               )}
-              {!record.canEdit
-                ? "View only"
-                : {
-                    saved: "All changes saved",
-                    unsaved: "Unsaved changes",
-                    saving: "Saving…",
-                    error: "Not saved",
-                    conflict: "Review changes",
-                  }[saveStatus]}
+              {saveLabel}
             </span>
             <div
               className="hidden -space-x-2 md:flex"
@@ -499,16 +502,44 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
           {record.canEdit ? "Editing" : "Viewing"}
         </span>
         <span className="flex items-center gap-1.5">
-          {connected ? (
+          {liveConnected ? (
             <Wifi size={14} className="text-teal-700" />
           ) : (
             <WifiOff size={14} />
           )}
-          {connected
+          {liveConnected
             ? "Live collaboration connected"
             : "Live collaboration unavailable"}
         </span>
+        <span
+          role="status"
+          aria-live="polite"
+          className={`flex w-full items-center gap-1.5 sm:hidden ${saveStatus === "error" || saveStatus === "conflict" ? "text-amber-700" : "text-slate-500"}`}
+        >
+          {saveStatus === "saving" ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : saveStatus === "saved" ? (
+            <Check size={13} className="text-teal-700" />
+          ) : (
+            <CloudOff size={13} />
+          )}
+          {saveLabel}
+        </span>
       </div>
+      {connectionError && (
+        <div
+          role="status"
+          className="mx-auto mb-4 flex max-w-4xl flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          <p className="flex-1">{connectionError}</p>
+          <button
+            onClick={reconnect}
+            className="rounded-md border border-amber-300 px-3 py-2 text-xs font-semibold"
+          >
+            Reconnect
+          </button>
+        </div>
+      )}
       {recoveryNotice && (
         <p
           role="status"

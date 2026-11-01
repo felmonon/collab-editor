@@ -17,12 +17,20 @@ export interface CollaborationDocument {
 
 interface Dependencies {
   origin: string;
+  refreshIntervalMs?: number;
   verifyTicket: (token: unknown) => Promise<CollaborationIdentity | null>;
   loadDocument: (id: string) => Promise<CollaborationDocument | null>;
 }
 
 type Participant = { id: string; userId: string; name: string; color: string };
-type Room = { users: Map<string, Participant>; updates: Promise<void> };
+type Room = {
+  users: Map<string, Participant>;
+  updates: Promise<void>;
+  revision: number;
+  pendingJoins: number;
+  refreshQueued: boolean;
+  timer?: ReturnType<typeof setInterval>;
+};
 const colors = [
   "#547968",
   "#8b5cf6",
@@ -40,13 +48,25 @@ function object(value: unknown): Record<string, unknown> {
 
 export function createCollaborationServer(
   httpServer: HttpServer,
-  { origin, verifyTicket, loadDocument }: Dependencies,
+  { origin, verifyTicket, loadDocument, refreshIntervalMs = 5000 }: Dependencies,
 ) {
   const io = new Server(httpServer, {
     cors: { origin, methods: ["GET", "POST"] },
     maxHttpBufferSize: 1_100_000,
   });
   const rooms = new Map<string, Room>();
+
+  function removeEmptyRoom(documentId: string, room: Room) {
+    if (room.users.size || room.pendingJoins || rooms.get(documentId) !== room)
+      return;
+    clearInterval(room.timer);
+    rooms.delete(documentId);
+  }
+
+  httpServer.once("close", () => {
+    for (const room of rooms.values()) clearInterval(room.timer);
+    rooms.clear();
+  });
 
   io.use(async (socket, next) => {
     try {
@@ -72,7 +92,7 @@ export function createCollaborationServer(
     io.to(documentId).emit("users-updated", {
       users: Array.from(room.users.values()),
     });
-    if (!room.users.size) rooms.delete(documentId);
+    removeEmptyRoom(documentId, room);
   }
 
   function removeRevokedParticipants(
@@ -101,10 +121,65 @@ export function createCollaborationServer(
     updatedAt: new Date(document.updatedAt).toISOString(),
   });
 
+  function reconcileAccess(
+    documentId: string,
+    room: Room,
+    document: CollaborationDocument | null,
+  ): document is CollaborationDocument {
+    if (rooms.get(documentId) !== room) return false;
+    if (!document) {
+      for (const id of room.users.keys())
+        io.sockets.sockets.get(id)?.disconnect(true);
+      return false;
+    }
+    // Sharing changes do not advance the document revision.
+    removeRevokedParticipants(documentId, document);
+    return rooms.get(documentId) === room;
+  }
+
+  function publishState(
+    documentId: string,
+    room: Room,
+    document: CollaborationDocument,
+    exceptSocketId?: string,
+  ) {
+    const revision = new Date(document.updatedAt).getTime();
+    if (revision <= room.revision) return;
+    room.revision = revision;
+    const recipients = io.to(documentId);
+    (exceptSocketId ? recipients.except(exceptSocketId) : recipients).emit(
+      "document-updated",
+      state(document),
+    );
+  }
+
+  function startRefresh(documentId: string, room: Room) {
+    if (room.timer) return;
+    // The HTTP save can finish after its writer closes or loses their socket.
+    // One queued refresh per active room recovers that missing notification.
+    room.timer = setInterval(() => {
+      if (room.refreshQueued || !room.users.size) return;
+      room.refreshQueued = true;
+      room.updates = room.updates
+        .then(async () => {
+          if (rooms.get(documentId) !== room || !room.users.size) return;
+          const document = await loadDocument(documentId);
+          if (reconcileAccess(documentId, room, document))
+            publishState(documentId, room, document);
+        })
+        // A temporary database failure must not stop subsequent refreshes.
+        .catch(() => {})
+        .finally(() => {
+          room.refreshQueued = false;
+        });
+    }, refreshIntervalMs);
+    room.timer.unref();
+  }
+
   io.on("connection", (socket) => {
     const identity = socket.data.identity as CollaborationIdentity;
 
-    socket.on("join-document", async (payload: unknown) => {
+    socket.on("join-document", (payload: unknown) => {
       const { documentId } = object(payload);
       if (
         documentId !== identity.documentId ||
@@ -115,39 +190,61 @@ export function createCollaborationServer(
         });
         return;
       }
-      try {
-        const document = await loadDocument(documentId);
-        if (!socket.connected) return;
-        if (!document || !getDocumentPermission(document, identity.userId)) {
-          socket.emit("collaboration-error", {
-            message: "Document not found or access removed",
-          });
-          return;
-        }
-        leave(socket);
-        let room = rooms.get(documentId);
-        if (!room) {
-          room = { users: new Map(), updates: Promise.resolve() };
-          rooms.set(documentId, room);
-        }
-        socket.data.documentId = documentId;
-        const participant = {
-          id: socket.id,
-          userId: identity.userId,
-          name: identity.name,
-          color: colors[room.users.size % colors.length],
+      let room = rooms.get(documentId);
+      if (!room) {
+        room = {
+          users: new Map(),
+          updates: Promise.resolve(),
+          revision: -Infinity,
+          pendingJoins: 0,
+          refreshQueued: false,
         };
-        room.users.set(socket.id, participant);
-        await socket.join(documentId);
-        socket.emit("document-state", state(document));
-        io.to(documentId).emit("users-updated", {
-          users: Array.from(room.users.values()),
-        });
-      } catch {
-        socket.emit("collaboration-error", {
-          message: "Unable to open live collaboration",
-        });
+        rooms.set(documentId, room);
       }
+      const joiningRoom = room;
+      joiningRoom.pendingJoins++;
+      joiningRoom.updates = joiningRoom.updates
+        .then(async () => {
+          if (!socket.connected || rooms.get(documentId) !== joiningRoom) return;
+          const document = await loadDocument(documentId);
+          if (!socket.connected || rooms.get(documentId) !== joiningRoom) return;
+          if (
+            !reconcileAccess(documentId, joiningRoom, document) ||
+            !getDocumentPermission(document, identity.userId)
+          ) {
+            socket.emit("collaboration-error", {
+              message: "Document not found or access removed",
+            });
+            return;
+          }
+          leave(socket);
+          socket.data.documentId = documentId;
+          const participant = {
+            id: socket.id,
+            userId: identity.userId,
+            name: identity.name,
+            color: colors[joiningRoom.users.size % colors.length],
+          };
+          joiningRoom.users.set(socket.id, participant);
+          await socket.join(documentId);
+          if (!socket.connected) return;
+          // Rejoining also catches peers up before the next periodic refresh.
+          publishState(documentId, joiningRoom, document, socket.id);
+          socket.emit("document-state", state(document));
+          io.to(documentId).emit("users-updated", {
+            users: Array.from(joiningRoom.users.values()),
+          });
+          startRefresh(documentId, joiningRoom);
+        })
+        .catch(() => {
+          socket.emit("collaboration-error", {
+            message: "Unable to open live collaboration",
+          });
+        })
+        .finally(() => {
+          joiningRoom.pendingJoins--;
+          removeEmptyRoom(documentId, joiningRoom);
+        });
     });
 
     // A notification follows a successful HTTP save. Only persisted content is broadcast.
@@ -163,15 +260,14 @@ export function createCollaborationServer(
       if (!room) return;
       room.updates = room.updates
         .then(async () => {
-          if (!socket.connected || socket.data.documentId !== documentId)
+          if (
+            !socket.connected ||
+            socket.data.documentId !== documentId ||
+            rooms.get(documentId) !== room
+          )
             return;
           const document = await loadDocument(documentId);
-          if (!document) {
-            for (const id of room.users.keys())
-              io.sockets.sockets.get(id)?.disconnect(true);
-            return;
-          }
-          removeRevokedParticipants(documentId, document);
+          if (!reconcileAccess(documentId, room, document)) return;
           if (
             !canEditDocument(getDocumentPermission(document, identity.userId))
           ) {
@@ -180,7 +276,9 @@ export function createCollaborationServer(
             });
             return;
           }
-          socket.to(documentId).emit("document-updated", state(document));
+          // A delayed notification may read a newer save from another writer.
+          // Its sender needs that canonical state too.
+          publishState(documentId, room, document);
         })
         .catch(() => {
           socket.emit("collaboration-error", {

@@ -24,6 +24,7 @@ import {
   type EditorDraft,
   type SavedEditorDraft,
 } from "@/lib/editor-save";
+import { draftRecovery, reconcileRecoveredDraft } from "@/lib/editor-recovery";
 
 interface DocumentRecord {
   id: string;
@@ -52,6 +53,7 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
   const dirtyRef = useRef(false);
   const inFlightRef = useRef<AbortController | null>(null);
   const pendingRemoteRef = useRef<SavedEditorDraft | null>(null);
+  const discardRecoveryRef = useRef(false);
   const generationRef = useRef(0);
   const loadingRef = useRef(true);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,18 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
   const [saveError, setSaveError] = useState("");
   const [reloadCount, setReloadCount] = useState(0);
   const [sharing, setSharing] = useState(false);
+  const [recoveryNotice, setRecoveryNotice] = useState("");
+  const [recoveryUnavailable, setRecoveryUnavailable] = useState(false);
+  const userId = session?.user?.id;
+  const rememberDraft = useCallback(
+    (next: EditorDraft, baseRevision: string) => {
+      if (!userId) return;
+      setRecoveryUnavailable(
+        !draftRecovery.write(userId, id, { draft: next, baseRevision }),
+      );
+    },
+    [userId, id],
+  );
   function updateStatus(next: SaveStatus) {
     statusRef.current = next;
     setSaveStatus(next);
@@ -117,7 +131,8 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
   }, [sessionStatus, router, id]);
 
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!userId) return;
+    const recoveryUserId: string = userId;
     const controller = new AbortController();
     const generation = ++generationRef.current;
     loadingRef.current = true;
@@ -143,22 +158,46 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
           pendingRemoteRef.current.updatedAt > data.updatedAt
             ? pendingRemoteRef.current
             : null;
-        const next = newerRemote
-          ? { title: newerRemote.title, content: newerRemote.content }
-          : {
-              title: data.title,
-              content: typeof data.content === "string" ? data.content : "",
-            };
-        pendingRemoteRef.current = null;
-        draftRef.current = next;
-        revisionRef.current = newerRemote?.updatedAt ?? data.updatedAt;
-        dirtyRef.current = false;
-        setDraft(next);
+        const saved = newerRemote ?? {
+          title: data.title,
+          content: typeof data.content === "string" ? data.content : "",
+          updatedAt: data.updatedAt,
+        };
+        const recovered = reconcileRecoveredDraft(
+          saved,
+          discardRecoveryRef.current
+            ? null
+            : draftRecovery.read(recoveryUserId, id),
+        );
+        discardRecoveryRef.current = false;
+        const hasPendingDraft = recovered.status !== "saved";
+        const nextStatus =
+          hasPendingDraft && !data.canEdit ? "conflict" : recovered.status;
+        pendingRemoteRef.current = nextStatus === "conflict" ? saved : null;
+        draftRef.current = recovered.draft;
+        revisionRef.current = recovered.revision;
+        dirtyRef.current = hasPendingDraft;
+        if (hasPendingDraft) {
+          rememberDraft(recovered.draft, recovered.revision);
+        } else {
+          draftRecovery.clear(recoveryUserId, id);
+          setRecoveryUnavailable(false);
+        }
+        setDraft(recovered.draft);
         setRecord(data);
         setLoadError("");
-        setSaveError("");
-        statusRef.current = "saved";
-        setSaveStatus("saved");
+        setRecoveryNotice(
+          hasPendingDraft ? "Recovered your unsaved changes from this tab." : "",
+        );
+        setSaveError(
+          nextStatus === "conflict"
+            ? !data.canEdit
+              ? "Your unsaved draft is still here, but you now have view-only access. Download it before loading the saved version."
+              : CONFLICT_MESSAGE
+            : "",
+        );
+        statusRef.current = nextStatus;
+        setSaveStatus(nextStatus);
       } catch (error) {
         if (!controller.signal.aborted && generation === generationRef.current)
           setLoadError(
@@ -181,7 +220,7 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
       inFlightRef.current?.abort();
       inFlightRef.current = null;
     };
-  }, [id, session?.user?.id, reloadCount]);
+  }, [id, userId, reloadCount, rememberDraft]);
 
   const save = useCallback(async () => {
     if (
@@ -244,6 +283,13 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
       statusRef.current = resolved.status;
       setSaveStatus(resolved.status);
       setSaveError(resolved.status === "conflict" ? CONFLICT_MESSAGE : "");
+      if (resolved.dirty) {
+        // An earlier save must not erase newer edits made while it was pending.
+        rememberDraft(resolved.draft, resolved.revision);
+      } else if (userId) {
+        draftRecovery.clear(userId, id);
+        setRecoveryUnavailable(false);
+      }
       sendUpdate(snapshot.content, data.updatedAt, data.title);
     } catch (error) {
       if (!controller.signal.aborted && generation === generationRef.current) {
@@ -264,7 +310,7 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
     } finally {
       if (inFlightRef.current === controller) inFlightRef.current = null;
     }
-  }, [id, record?.canEdit, sendUpdate]);
+  }, [id, userId, record?.canEdit, sendUpdate, rememberDraft]);
 
   useEffect(() => {
     if (saveStatus !== "unsaved") return;
@@ -301,6 +347,8 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
     if (loadingRef.current || !record?.canEdit) return;
     draftRef.current = next;
     dirtyRef.current = true;
+    // Persist synchronously: browser Back can unmount us before autosave runs.
+    rememberDraft(next, revisionRef.current);
     setDraft(next);
     if (statusRef.current !== "conflict" && statusRef.current !== "saving")
       updateStatus("unsaved");
@@ -323,6 +371,8 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
       )
     )
       return;
+    // Keep the backup until the replacement actually loads successfully.
+    discardRecoveryRef.current = true;
     loadingRef.current = true;
     setLoading(true);
     setReloadCount((count) => count + 1);
@@ -459,6 +509,23 @@ function DocumentRoom({ documentId: id }: { documentId: string }) {
             : "Live collaboration unavailable"}
         </span>
       </div>
+      {recoveryNotice && (
+        <p
+          role="status"
+          className="mx-auto mb-4 max-w-4xl rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-900"
+        >
+          {recoveryNotice}
+        </p>
+      )}
+      {recoveryUnavailable && saveStatus !== "saved" && (
+        <p
+          role="alert"
+          className="mx-auto mb-4 max-w-4xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          Browser recovery is unavailable. Keep this page open until your changes
+          are saved, or download your draft.
+        </p>
+      )}
       {saveError && (
         <div
           role="alert"

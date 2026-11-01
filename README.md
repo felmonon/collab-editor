@@ -83,6 +83,9 @@ Open [localhost:3000](http://localhost:3000), or go straight to [the demo](http:
 | `SOCKET_PORT` / `PORT`        | Socket listening port; default `3001`                                         |
 | `GITHUB_ID` / `GITHUB_SECRET` | Optional GitHub OAuth; leave blank to hide the button                         |
 | `GOOGLE_ID` / `GOOGLE_SECRET` | Optional Google OAuth; leave blank to hide the button                         |
+| `APPLE_ID` / `APPLE_SECRET` | Optional Apple Services ID and client-secret JWT; requires HTTPS |
+
+See [Social sign-in setup](docs/social-sign-in.md) for Google, Apple, and GitHub registration, exact callbacks, Apple secret rotation, and account-linking behavior.
 
 `next dev` loads `.env` automatically. The standalone socket service also loads Next.js environment files. Never commit real credentials. Use `prisma db push` only for local setup or an appropriately planned schema change.
 
@@ -105,7 +108,7 @@ Deploy the Next.js app to Vercel and the Socket.io process as a separate persist
 
 If the socket service is unavailable, account documents can still save through the API; the interface reports collaboration as unavailable. A reconnect loads the latest saved revision.
 
-Before using this portfolio project as a production team service, add managed password recovery, account verification, abuse controls, operational monitoring, and a migration/deployment strategy. Version-history tables exist in the schema, but no version-history UI is claimed. Google/GitHub OAuth requires your own provider configuration.
+Before using this portfolio project as a production team service, add managed password recovery, account verification, abuse controls, operational monitoring, and a migration/deployment strategy. Version-history tables exist in the schema, but no version-history UI is claimed. Google, Apple, and GitHub OAuth require your own provider configuration; code support alone does not activate a provider.
 
 ## Stack
 

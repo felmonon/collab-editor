@@ -408,6 +408,9 @@ export default function Home() {
             A little more room for your ideas.
           </p>
           <div className="flex items-center gap-6 text-xs text-[#686e7c]">
+            <Link href="/privacy" className="hover:text-[#315BEE]">
+              Privacy
+            </Link>
             <Link href="/login" className="hover:text-[#315BEE]">
               Sign in
             </Link>

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { BrandLogo } from "@/components/ui/brand";
+import { AccountMenu } from "@/components/account/account-menu";
 import {
   DocumentCollection,
   Initials,
@@ -420,9 +421,7 @@ export default function DocumentsPage() {
             className="hidden h-5 w-px bg-[#e9ebf2] sm:block"
             aria-hidden="true"
           />
-          <span title={userName}>
-            <Initials name={userName} />
-          </span>
+          <AccountMenu name={userName} email={session.user.email} />
         </div>
       </header>
 

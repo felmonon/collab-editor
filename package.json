@@ -13,7 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
-    "test": "tsx --test src/lib/documents/*.test.ts src/lib/socket/*.test.ts src/lib/editor-*.test.ts src/lib/github-oauth.test.ts src/lib/social-oauth.test.ts server/*.test.ts",
+    "test": "tsx --test src/lib/documents/*.test.ts src/lib/socket/*.test.ts src/lib/editor-*.test.ts src/lib/github-oauth.test.ts src/lib/social-oauth.test.ts server/*.test.ts src/lib/auth-providers.test.ts src/lib/provider-link*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

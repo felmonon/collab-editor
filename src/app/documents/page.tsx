@@ -20,6 +20,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings2,
   Users,
   X,
 } from "lucide-react";
@@ -314,6 +315,14 @@ export default function DocumentsPage() {
             For first drafts and the ideas that follow.
           </p>
         </div>
+        <Link
+          href="/account"
+          onClick={() => mobileNavigation.current?.close()}
+          className="focus-ring -mx-1 mb-4 flex min-h-10 items-center gap-2.5 rounded-lg px-2 text-xs text-[#a5adbe] hover:bg-white/5 hover:text-white"
+        >
+          <Settings2 size={15} aria-hidden="true" />
+          Account settings
+        </Link>
         <div className="flex items-center gap-2.5">
           <Initials name={userName} inverted />
           <div className="min-w-0 flex-1">

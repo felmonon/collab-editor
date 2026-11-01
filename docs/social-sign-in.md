@@ -22,7 +22,7 @@ Production `NEXTAUTH_URL` is `https://collab-editor-sand.vercel.app`. Keep a str
 
 The app requests only `openid email profile` for identity, email, and basic profile information. It does not request Drive, Gmail, Calendar, or offline access. See Google’s [OpenID Connect setup and scope definitions](https://developers.google.com/identity/openid-connect/openid-connect) and [OAuth client configuration](https://support.google.com/cloud/answer/15549257).
 
-Production registration: Google Cloud project **Collab Editor** (`linen-mapper-513422-v3`). Publishing status, provider credentials, and callback verification must be checked independently of code deployment.
+Production registration: Google Cloud project **Collab Editor** (`linen-mapper-513422-v3`), published to production on November 1, 2026. Publishing status, provider credentials, and callback verification must be checked independently of code deployment.
 
 ## Apple
 
@@ -38,9 +38,17 @@ Production registration: Services ID `com.felmonon.collabeditor.web`, primary Ap
 
 Create or edit the OAuth app in GitHub’s developer settings. Set its homepage to the production origin and its authorization callback to the GitHub URL above. Put its client ID and secret in `GITHUB_ID` and `GITHUB_SECRET`. Preserve the app’s existing sanitized token-exchange handler when changing configuration. See GitHub’s [OAuth app registration](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app).
 
+## Connect another sign-in method
+
+Existing users can open **Account settings → Sign-in methods** from the workspace and connect Google or GitHub while signed in with their original method. Connections are verified against persisted account records before the UI labels them connected. This adds a login method to the existing workspace; it does not merge two existing accounts or move documents.
+
+The authenticated connection request issues a five-minute encrypted intent bound to the current user and selected provider. OAuth's CSRF, state, and PKCE checks remain in place. The callback must still have the initiating session; a missing or changed session cannot attach an identity to a different account. Identities already connected to another account are rejected. Account responses include only provider names and whether password login exists, never access tokens or secrets.
+
+Apple remains available for signup and returning sign-in. Connecting Apple to an existing workspace is not offered: its cross-site POST does not carry the regular Lax session cookie, so the native authenticated linking flow cannot safely identify that workspace. Do not weaken the session cookie policy to bypass this restriction.
+
 ## Verify and maintain
 
 - Check `/api/auth/providers`: it should list only configured providers. Then complete a real sign-in, sign-out, and returning-user sign-in for each enabled provider. Provider discovery or a successful redirect alone does not prove a working callback.
 - For Apple, verify both first-consent and returning-user flows over HTTPS. Confirm that cancelling consent gives a recoverable error and no session, and that the return location is the app.
-- If an email already belongs to an unlinked account, use the **original sign-in method**. The app deliberately sets `allowDangerousEmailAccountLinking: false`; do not enable automatic same-email linking to bypass `OAuthAccountNotLinked`. There is no account-linking screen. [NextAuth’s account-linking rationale](https://next-auth.js.org/faq#when-i-sign-in-with-another-account-with-the-same-email-address-why-are-accounts-not-linked-automatically).
+- If an email already belongs to an unlinked account, use the **original sign-in method**, then connect Google or GitHub from Account settings. The app deliberately sets `allowDangerousEmailAccountLinking: false`; do not enable automatic same-email linking to bypass `OAuthAccountNotLinked`. [NextAuth’s account-linking rationale](https://next-auth.js.org/faq#when-i-sign-in-with-another-account-with-the-same-email-address-why-are-accounts-not-linked-automatically).
 - For redirect errors, compare the complete registered callback and `NEXTAUTH_URL`, including scheme and port. For Apple `invalid_client`, check the JWT expiration, Services ID, Team ID, Key ID, and signature. Keep tokens, private keys, client secrets, and callback bodies out of logs and support reports.

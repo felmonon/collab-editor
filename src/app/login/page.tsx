@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { BrandLogo } from "@/components/ui/brand";
 import {
   oauthErrorMessage,
+  safeSignInDestination,
   socialProviderIds,
   socialProviderNames,
   type SocialProviderId,
@@ -82,10 +83,10 @@ function LoginContent() {
   const [notice, setNotice] = useState("");
   const busy = loading || oauthLoading !== null;
   const callback = searchParams.get("callbackUrl");
-  const callbackUrl =
-    callback === "/documents" || callback?.startsWith("/documents/")
-      ? callback
-      : "/documents";
+  const callbackUrl = safeSignInDestination(
+    callback,
+    typeof window === "undefined" ? undefined : window.location.origin,
+  );
   const callbackError = searchParams.get("error");
   const oauthError =
     callbackError && callbackError !== dismissedCallbackError
@@ -122,8 +123,13 @@ function LoginContent() {
   }, [providerAttempt]);
 
   useEffect(() => {
-    if (status === "authenticated") router.replace(callbackUrl);
-  }, [status, router, callbackUrl]);
+    if (status === "authenticated") {
+      const destination = callbackUrl === "/account" && callbackError
+        ? `/account?error=${encodeURIComponent(callbackError)}`
+        : callbackUrl;
+      router.replace(destination);
+    }
+  }, [status, router, callbackUrl, callbackError]);
 
   function updateField(field: Field, value: string) {
     setFormData((previous) => ({ ...previous, [field]: value }));

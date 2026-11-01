@@ -7,7 +7,7 @@ import {
   type Editor,
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import {
   Bold,
   Italic,
@@ -25,7 +25,7 @@ import {
   Minimize2,
   Minus,
 } from "lucide-react";
-import { downloadDocument, toMarkdown } from "@/lib/editor-document";
+import { downloadDocument, documentMarkdown } from "@/lib/editor-document";
 
 interface TiptapEditorProps {
   content: string;
@@ -40,12 +40,16 @@ function MenuButton({
   active = false,
   disabled = false,
   label,
+  expanded,
+  controls,
   children,
 }: {
   onClick: () => void;
   active?: boolean;
   disabled?: boolean;
   label: string;
+  expanded?: boolean;
+  controls?: string;
   children: ReactNode;
 }) {
   return (
@@ -55,6 +59,8 @@ function MenuButton({
       title={label}
       aria-label={label}
       aria-pressed={active}
+      aria-expanded={expanded}
+      aria-controls={controls}
       disabled={disabled}
       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-30 ${active ? "bg-teal-100 text-teal-800" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
     >
@@ -110,7 +116,12 @@ function EditorSurface({
   title = "Untitled",
   onTitleChange,
 }: Omit<TiptapEditorProps, "onUpdate"> & { editor: Editor }) {
-  const [outlineOpen, setOutlineOpen] = useState(true);
+  const [outlineOpen, setOutlineOpen] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 1280px)").matches,
+  );
+  const outlineId = useId();
   const [focusMode, setFocusMode] = useState(false);
   const state = useEditorState({
     editor,
@@ -290,7 +301,7 @@ function EditorSurface({
               onClick={() =>
                 downloadDocument(
                   title || "Untitled",
-                  `# ${(title || "Untitled").replace(/\n/g, " ")}\n\n${toMarkdown(editor.getJSON())}`,
+                  documentMarkdown(title || "Untitled", editor.getJSON()),
                 )
               }
             >
@@ -306,6 +317,8 @@ function EditorSurface({
             <MenuButton
               label="Toggle document outline"
               active={outlineOpen}
+              expanded={outlineOpen}
+              controls={outlineId}
               onClick={() => setOutlineOpen(!outlineOpen)}
             >
               <PanelRight size={16} />
@@ -314,9 +327,56 @@ function EditorSurface({
         </div>
       </div>
       <div
-        className={`mx-auto flex max-w-[1200px] items-start justify-center gap-8 px-3 py-6 sm:px-6 sm:py-10 ${focusMode ? "min-h-screen" : ""}`}
+        className={`mx-auto flex max-w-[1200px] flex-col items-center justify-center gap-6 px-3 py-6 sm:px-6 sm:py-10 xl:flex-row xl:items-start xl:gap-8 ${focusMode ? "min-h-screen" : ""}`}
       >
-        <div className="min-w-0 flex-1 max-w-[820px]">
+        {outlineOpen && (
+          <aside
+            id={outlineId}
+            className={`w-full max-w-[820px] shrink-0 rounded-lg border bg-white p-4 xl:sticky xl:order-last xl:w-48 xl:max-w-none xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:pt-4 ${focusMode ? "xl:top-24" : "xl:top-40"}`}
+            aria-label="Document outline"
+          >
+            <p className="mb-5 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-400">
+              On this page
+            </p>
+            {state.headings.length ? (
+              <nav className="max-h-60 space-y-1 overflow-y-auto border-l border-slate-200 xl:max-h-[50vh]">
+                {state.headings.map((heading) => (
+                  <button
+                    key={heading.position}
+                    onClick={() =>
+                      editor
+                        .chain()
+                        .focus()
+                        .setTextSelection(heading.position + 1)
+                        .scrollIntoView()
+                        .run()
+                    }
+                    className="block w-full truncate border-l-2 border-transparent py-2 pr-1 text-left text-xs text-slate-500 hover:border-teal-600 hover:text-teal-700"
+                    style={{ paddingLeft: `${12 + (heading.level - 1) * 8}px` }}
+                  >
+                    {heading.text || "Untitled section"}
+                  </button>
+                ))}
+              </nav>
+            ) : (
+              <p className="text-xs leading-6 text-slate-400">
+                Add headings to give your document a little structure. They’ll
+                appear here.
+              </p>
+            )}
+            <div className="mt-10 hidden rounded-lg border border-[#e0e7e4] bg-[#edf3ef] p-4 xl:block">
+              <p className="mb-2 text-xs font-medium text-[#47675f]">
+                A little writing tip
+              </p>
+              <p className="text-xs leading-5 text-[#6d817a]">
+                Type <kbd className="rounded bg-white px-1">#</kbd> and a space
+                for a heading, or <kbd className="rounded bg-white px-1">-</kbd>{" "}
+                for a list.
+              </p>
+            </div>
+          </aside>
+        )}
+        <div className="w-full min-w-0 flex-1 max-w-[820px]">
           <div className="editor-paper overflow-hidden border border-[#e4e7e8] bg-white shadow-[0_4px_24px_-16px_#16233330] sm:rounded-sm">
             <div className="px-6 pt-10 sm:px-16 sm:pt-14">
               <div className="mb-6 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[.17em] text-teal-700">
@@ -349,52 +409,6 @@ function EditorSurface({
             </span>
           </footer>
         </div>
-        {outlineOpen && !focusMode && (
-          <aside
-            className="sticky top-40 hidden w-48 shrink-0 pt-4 xl:block"
-            aria-label="Document outline"
-          >
-            <p className="mb-5 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-400">
-              On this page
-            </p>
-            {state.headings.length ? (
-              <nav className="space-y-1 border-l border-slate-200">
-                {state.headings.map((heading) => (
-                  <button
-                    key={heading.position}
-                    onClick={() =>
-                      editor
-                        .chain()
-                        .focus()
-                        .setTextSelection(heading.position + 1)
-                        .scrollIntoView()
-                        .run()
-                    }
-                    className="block w-full truncate border-l-2 border-transparent py-2 pr-1 text-left text-xs text-slate-500 hover:border-teal-600 hover:text-teal-700"
-                    style={{ paddingLeft: `${12 + (heading.level - 1) * 8}px` }}
-                  >
-                    {heading.text || "Untitled section"}
-                  </button>
-                ))}
-              </nav>
-            ) : (
-              <p className="text-xs leading-6 text-slate-400">
-                Add headings to give your document a little structure. They’ll
-                appear here.
-              </p>
-            )}
-            <div className="mt-10 rounded-lg border border-[#e0e7e4] bg-[#edf3ef] p-4">
-              <p className="mb-2 text-xs font-medium text-[#47675f]">
-                A little writing tip
-              </p>
-              <p className="text-xs leading-5 text-[#6d817a]">
-                Type <kbd className="rounded bg-white px-1">#</kbd> and a space
-                for a heading, or <kbd className="rounded bg-white px-1">-</kbd>{" "}
-                for a list.
-              </p>
-            </div>
-          </aside>
-        )}
       </div>
     </section>
   );

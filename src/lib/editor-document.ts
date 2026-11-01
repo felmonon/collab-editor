@@ -7,7 +7,17 @@ export interface DocumentNode {
 }
 
 function escapeMarkdown(text: string) {
-  return text.replace(/([\\`*_{}\[\]<>])/g, "\\$1");
+  return text.replace(/&/g, "&amp;").replace(/([\\`*_{}\[\]<>#!~])/g, "\\$1");
+}
+
+function escapeParagraphStarts(text: string) {
+  return text
+    // Literal paragraphs must not turn into lists, rules, or setext headings.
+    .replace(/^( {0,3})([-+])(?=[\t ]|$)/gm, "$1\\$2")
+    .replace(/^( {0,3}\d{1,9})([.)])(?=[\t ]|$)/gm, "$1\\$2")
+    .replace(/^( {0,3})([-=])(?=[-=\t ]*$)/gm, "$1\\$2")
+    // An entity preserves leading whitespace without creating an indented code block.
+    .replace(/^( {4,}|\t)/gm, (indent) => `&#32;${indent.slice(1)}`);
 }
 
 /** Export the editor's parsed document, never untrusted HTML. */
@@ -35,7 +45,12 @@ export function toMarkdown(node: DocumentNode): string {
           typeof mark.attrs?.href === "string" &&
           /^(https?:|mailto:)/i.test(mark.attrs.href)
         ) {
-          text = `[${text}](${mark.attrs.href.replace(/[()\s]/g, (value) => (value === "(" ? "%28" : value === ")" ? "%29" : encodeURIComponent(value)))})`;
+          const destination = mark.attrs.href
+            .replace(/[()<>`"\\\s\u0000-\u001f\u007f]/g, (value) =>
+              value === "(" ? "%28" : value === ")" ? "%29" : encodeURIComponent(value),
+            )
+            .replace(/&/g, "&amp;");
+          text = `[${text}](${destination})`;
         }
       }
       return text;
@@ -43,7 +58,7 @@ export function toMarkdown(node: DocumentNode): string {
     case "heading":
       return `${"#".repeat(Number(node.attrs?.level) || 1)} ${children()}\n\n`;
     case "paragraph":
-      return `${children()}\n\n`;
+      return `${escapeParagraphStarts(children())}\n\n`;
     case "hardBreak":
       return "  \n";
     case "horizontalRule":
@@ -80,6 +95,12 @@ export function toMarkdown(node: DocumentNode): string {
     default:
       return children();
   }
+}
+
+/** Titles are editor text too, rather than raw Markdown or HTML. */
+export function documentMarkdown(title: string, document: DocumentNode): string {
+  const heading = title.replace(/[\r\n]+/g, " ").trim() || "Untitled document";
+  return `# ${escapeMarkdown(heading)}\n\n${toMarkdown(document)}`;
 }
 
 export function downloadDocument(

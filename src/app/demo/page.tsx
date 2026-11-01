@@ -152,6 +152,10 @@ function DemoWorkspace() {
         <span className="flex items-center gap-1.5">
           <ShieldCheck size={14} /> Local demo · only visible in this browser
         </span>
+        <span role="status" className="flex w-full items-center gap-1.5 lg:hidden">
+          <Check size={14} className="text-teal-700" />
+          {storageAvailable ? "Saved in this browser" : "Browser storage unavailable"}
+        </span>
       </div>
       {!storageAvailable && (
         <p

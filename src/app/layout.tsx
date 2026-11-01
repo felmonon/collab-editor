@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Collab Editor - Real-Time Collaborative Documents",
+  title: "Collab — A shared space for your best work",
   description:
-    "A calm workspace for writing, sharing, and shaping ideas together. Try the interactive editor without an account.",
+    "Write something worth sharing. A focused workspace for documents, live collaboration, and ideas in motion. Try the editor without an account.",
 };
 
 export default function RootLayout({

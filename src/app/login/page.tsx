@@ -7,13 +7,15 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
   Check,
   FileText,
   Loader2,
-  PenLine,
+  MousePointer2,
 } from "lucide-react";
 import { OAuthButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BrandLogo } from "@/components/ui/brand";
 
 type FormData = {
   name: string;
@@ -27,10 +29,10 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function LoginLoading() {
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-[#faf9f6]"
+      className="flex min-h-screen items-center justify-center bg-[#f6f7fb]"
       role="status"
     >
-      <Loader2 className="h-7 w-7 animate-spin text-[#167d72]" />
+      <Loader2 className="h-7 w-7 animate-spin text-[#315BEE]" />
       <span className="sr-only">Loading sign in</span>
     </div>
   );
@@ -229,97 +231,107 @@ function LoginContent() {
   }
 
   return (
-    <main className="flex min-h-screen bg-[#faf9f6] text-[#162333]">
-      <aside className="hidden w-[45%] flex-col justify-between border-r border-[#e1e5df] bg-[#edf1eb] p-10 lg:flex xl:p-14">
+    <main className="flex min-h-screen bg-white text-[#191b23]">
+      <aside className="sticky top-0 hidden h-screen min-h-[760px] w-[46%] shrink-0 flex-col justify-between overflow-hidden bg-[#191b23] p-10 text-white lg:flex xl:p-14">
         <Link
           href="/"
-          className="flex w-fit items-center gap-2.5 text-lg font-semibold"
+          aria-label="Collab Editor home"
+          className="relative z-10 w-fit"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#162333] text-white">
-            <PenLine className="h-5 w-5" />
-          </span>
-          collab
-          <span className="-ml-1 font-normal text-[#69737b]"> / editor</span>
+          <BrandLogo inverted />
         </Link>
-        <div className="my-12 max-w-sm">
-          <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#167d72]">
-            Your ideas belong here
+        <div className="relative z-10 my-10 max-w-lg">
+          <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.15em] text-[#9ba9d0]">
+            Make space for the next idea
           </p>
-          <h2
-            className="text-5xl leading-[1.1] tracking-[-0.04em] xl:text-6xl"
-            style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-          >
-            A fresh page.
+          <h2 className="text-[44px] font-semibold leading-[1.05] tracking-[-0.055em] xl:text-[58px]">
+            A little space.
             <br />
-            <em className="font-normal text-[#167d72]">A clear mind.</em>
+            <span className="text-[#a6baff]">A lot of possibility.</span>
           </h2>
-          <p className="mt-6 text-base leading-7 text-[#63736b]">
-            Bring your notes, plans, and next big idea into one thoughtful
-            workspace.
+          <p className="mt-5 max-w-sm text-sm leading-7 text-[#a0a5b6]">
+            A place for your notes, your plans, and the people who make them
+            better.
           </p>
-          <div className="mt-9 rotate-[-2deg] rounded-lg border border-[#dce3d9] bg-white p-7 shadow-[0_12px_30px_-20px_rgba(22,35,51,0.25)]">
-            <FileText
-              className="mb-5 h-5 w-5 text-[#167d72]"
-              strokeWidth={1.5}
-            />
-            <p
-              className="mb-4 text-xl"
-              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-            >
-              Everything starts with an idea.
-            </p>
-            <p className="text-xs leading-6 text-[#738077]">
-              A place to capture it.
-              <br />
-              The tools to give it shape.
-              <br />
-              Room to make it better, together.
-            </p>
-            <div className="mt-5 flex items-center gap-1.5 border-t border-[#e9ede5] pt-4 text-[10px] text-[#167d72]">
-              <Check className="h-3 w-3" /> Ready when you are
+          <div aria-hidden="true" className="relative ml-2 mt-12 mr-5 max-w-sm">
+            <div className="absolute inset-0 translate-x-6 -translate-y-3 rotate-[5deg] rounded-xl border border-white/20 bg-[#315BEE]" />
+            <div className="relative rotate-[-3deg] rounded-xl bg-white p-7 text-[#191b23] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.4)] xl:p-8">
+              <div className="mb-7 flex items-center justify-between">
+                <span className="flex items-center gap-2 text-[10px] font-medium text-[#747985]">
+                  <FileText size={13} /> The next chapter
+                </span>
+                <span className="h-2 w-2 rounded-full bg-[#315BEE]" />
+              </div>
+              <p className="text-[27px] font-semibold leading-[1.15] tracking-[-0.04em]">
+                Good things start
+                <br />
+                with a shared idea.
+              </p>
+              <p className="mt-4 text-xs leading-6 text-[#747985]">
+                A question. A fresh perspective.
+                <br />A little room to see where it goes.
+              </p>
+              <div className="relative mt-5 border-l-2 border-[#315BEE] bg-[#f0f3ff] px-3 py-2.5 text-xs text-[#536da9]">
+                Let’s make something of it.
+                <span className="absolute -bottom-4 right-3 flex items-start text-[#315BEE]">
+                  <MousePointer2 size={19} fill="currentColor" stroke="white" />
+                  <span className="mt-3 rounded-r-md rounded-bl-md bg-[#315BEE] px-2 py-1 text-[9px] text-white">
+                    Maya
+                  </span>
+                </span>
+              </div>
+              <div className="mt-7 flex items-center gap-1.5 border-t border-[#edf0f5] pt-4 text-[9px] text-[#969ba8]">
+                <Check size={11} /> An illustration of ideas coming together
+              </div>
             </div>
           </div>
         </div>
         <Link
           href="/demo"
-          className="flex w-fit items-center gap-2 text-sm font-medium text-[#52665a] hover:text-[#167d72]"
+          className="relative z-10 inline-flex w-fit items-center gap-2 text-xs font-medium text-[#c8cddd] transition-colors hover:text-white"
         >
-          Just looking? Try the editor <ArrowRight className="h-4 w-4" />
+          Take a look around first <ArrowUpRight size={14} />
         </Link>
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-56 -left-32 h-[530px] w-[420px] rotate-[25deg] rounded-[60px] border border-white/10"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-64 -left-20 h-[530px] w-[420px] rotate-[25deg] rounded-[60px] border border-white/10"
+        />
       </aside>
-
-      <div className="flex flex-1 flex-col px-6 py-7 sm:px-10">
-        <Link
-          href="/"
-          className="flex w-fit items-center gap-2 text-xs text-[#63707a] hover:text-[#167d72]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back to home
-        </Link>
-        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col px-6 py-7 sm:px-10 lg:px-12">
+        <div className="flex items-center justify-between gap-4">
+          <Link href="/" aria-label="Collab Editor home" className="lg:hidden">
+            <BrandLogo />
+          </Link>
+          <Link
+            href="/"
+            className="ml-auto inline-flex items-center gap-1.5 text-xs text-[#686e7c] transition-colors hover:text-[#191b23]"
+          >
+            <ArrowLeft size={13} /> Back to home
+          </Link>
+        </div>
+        <div className="mx-auto flex w-full max-w-[384px] flex-1 flex-col justify-center py-12 sm:py-14">
           <div className="mb-7">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#167d72]">
-              {isLogin
-                ? "Your workspace is waiting"
-                : "Make room for your next idea"}
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#686e7c]">
+              Your writing space
             </p>
-            <h1
-              className="text-3xl tracking-tight"
-              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-            >
-              {isLogin ? "Welcome back." : "Let’s get you started."}
+            <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.045em] sm:text-[36px]">
+              {isLogin ? "Welcome back." : "Your next chapter."}
             </h1>
-            <p className="mt-3 text-sm leading-6 text-[#63707a]">
+            <p className="mt-3 text-sm leading-6 text-[#686e7c]">
               {isLogin
-                ? "Sign in to pick up where you left off."
-                : "Create your account to save and organize your documents."}
+                ? "Pick up a thought. Make something of it."
+                : "Create an account. Give your ideas a home."}
             </p>
           </div>
-
           {providers.some(
             (provider) => provider === "google" || provider === "github",
           ) && (
             <>
-              <div className="mb-5 space-y-3">
+              <div className="mb-6 space-y-2.5">
                 {(["google", "github"] as const)
                   .filter((provider) => providers.includes(provider))
                   .map((provider) => (
@@ -327,20 +339,20 @@ function LoginContent() {
                       key={provider}
                       type="button"
                       provider={provider}
+                      size="md"
                       onClick={() => handleOAuth(provider)}
                       loading={oauthLoading === provider}
                       disabled={busy}
                     />
                   ))}
               </div>
-              <div className="mb-5 flex items-center gap-4 text-[11px] text-[#7c878e]">
-                <span className="h-px flex-1 bg-[#e2e6e1]" />
-                or with your email
-                <span className="h-px flex-1 bg-[#e2e6e1]" />
+              <div className="mb-6 flex items-center gap-4 text-[10px] text-[#686e7c]">
+                <span className="h-px flex-1 bg-[#e6e8ef]" />
+                or continue with email
+                <span className="h-px flex-1 bg-[#e6e8ef]" />
               </div>
             </>
           )}
-
           {(formError || oauthError) && (
             <p
               role="alert"
@@ -352,12 +364,11 @@ function LoginContent() {
           {notice && (
             <p
               role="status"
-              className="mb-5 rounded-lg border border-[#c8ded2] bg-[#edf6ef] px-4 py-3 text-sm leading-6 text-[#27684b]"
+              className="mb-5 rounded-lg border border-[#cbd6ff] bg-[#f0f3ff] px-4 py-3 text-sm leading-6 text-[#315BEE]"
             >
               {notice}
             </p>
           )}
-
           <form
             ref={formRef}
             onSubmit={handleSubmit}
@@ -427,7 +438,7 @@ function LoginContent() {
               <div className="text-right">
                 <Link
                   href="/forgot-password"
-                  className="text-xs font-medium text-[#167d72] hover:underline"
+                  className="text-xs font-medium text-[#686e7c] hover:text-[#315BEE]"
                 >
                   Trouble signing in?
                 </Link>
@@ -436,42 +447,45 @@ function LoginContent() {
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#167d72] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#10665d] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#167d72] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2.5 rounded-lg bg-[#315BEE] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2449ce] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#315BEE] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />{" "}
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   {isLogin ? "Signing in…" : "Creating your account…"}
                 </>
               ) : (
                 <>
                   {isLogin ? "Sign in" : "Create account"}
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight size={15} />
                 </>
               )}
             </button>
           </form>
-          <p className="mt-6 text-center text-xs leading-6 text-[#63707a]">
+          <p className="mt-6 text-center text-xs leading-6 text-[#686e7c]">
             {isLogin ? "New to Collab Editor?" : "Already have an account?"}{" "}
             <button
               type="button"
               disabled={busy}
               onClick={switchMode}
-              className="font-semibold text-[#167d72] hover:underline disabled:opacity-60"
+              className="font-semibold text-[#315BEE] hover:underline disabled:opacity-60"
             >
               {isLogin ? "Create an account" : "Sign in"}
             </button>
           </p>
-          <p className="mt-8 border-t border-[#e2e6e1] pt-5 text-center text-xs text-[#7c878e]">
-            Want to explore first?{" "}
+          <div className="mt-8 flex items-center justify-center gap-2 border-t border-[#e6e8ef] pt-5 text-[11px] text-[#686e7c]">
+            <span>Just looking around?</span>
             <Link
               href="/demo"
-              className="font-medium text-[#167d72] hover:underline"
+              className="inline-flex items-center gap-1 font-medium text-[#686e7c] hover:text-[#315BEE]"
             >
-              Try a local draft
+              Try the editor <ArrowUpRight size={12} />
             </Link>
-          </p>
+          </div>
         </div>
+        <p className="text-center text-[10px] text-[#686e7c]">
+          A little more room for your ideas.
+        </p>
       </div>
     </main>
   );

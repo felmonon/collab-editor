@@ -13,15 +13,29 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, success, hint, icon, showPasswordToggle, type, className = "", id, ...props }, ref) => {
+  (
+    {
+      label,
+      error,
+      success,
+      hint,
+      icon,
+      showPasswordToggle,
+      type,
+      className = "",
+      id,
+      ...props
+    },
+    ref,
+  ) => {
     const [showPassword, setShowPassword] = useState(false);
     const inputId = id || label?.toLowerCase().replace(/\s+/g, "-");
     const isPassword = type === "password";
     const actualType = isPassword && showPassword ? "text" : type;
 
     const baseInputClass = `
-      w-full px-4 py-3
-      bg-white border rounded-xl
+      w-full px-4 py-3.5
+      bg-white border rounded-lg
       text-gray-900 placeholder-gray-400
       transition-all duration-200
       focus:outline-none focus:ring-2 focus:ring-offset-0
@@ -31,8 +45,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const stateClass = error
       ? "border-red-300 focus:border-red-500 focus:ring-red-200"
       : success
-      ? "border-green-300 focus:border-green-500 focus:ring-green-200"
-      : "border-gray-200 focus:border-sky-500 focus:ring-sky-200 hover:border-gray-300";
+        ? "border-green-300 focus:border-green-500 focus:ring-green-200"
+        : "border-[#e0e3eb] focus:border-[#315BEE] focus:ring-[#315BEE]/10 hover:border-[#b9bfcc]";
 
     return (
       <div className="space-y-1.5">
@@ -64,7 +78,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               ${className}
             `}
             aria-invalid={!!error}
-            aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
+            aria-describedby={
+              error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined
+            }
             {...props}
           />
           {isPassword && showPasswordToggle && (
@@ -92,7 +108,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
         {error && (
-          <p id={`${inputId}-error`} className="text-sm text-red-600 flex items-center gap-1.5">
+          <p
+            id={`${inputId}-error`}
+            className="text-sm text-red-600 flex items-center gap-1.5"
+          >
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             {error}
           </p>
@@ -104,7 +123,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 Input.displayName = "Input";
@@ -115,7 +134,9 @@ interface PasswordStrengthProps {
 }
 
 export function PasswordStrength({ password }: PasswordStrengthProps) {
-  const getStrength = (pwd: string): { level: number; label: string; color: string } => {
+  const getStrength = (
+    pwd: string,
+  ): { level: number; label: string; color: string } => {
     if (!pwd) return { level: 0, label: "", color: "" };
 
     let score = 0;
@@ -149,30 +170,59 @@ export function PasswordStrength({ password }: PasswordStrengthProps) {
       </div>
       <div className="flex justify-between items-center">
         <span className="text-xs text-gray-500">Password strength:</span>
-        <span className={`text-xs font-medium ${
-          strength.level <= 1 ? "text-red-600" :
-          strength.level === 2 ? "text-orange-600" :
-          strength.level === 3 ? "text-sky-600" :
-          "text-green-600"
-        }`}>
+        <span
+          className={`text-xs font-medium ${
+            strength.level <= 1
+              ? "text-red-600"
+              : strength.level === 2
+                ? "text-orange-600"
+                : strength.level === 3
+                  ? "text-sky-600"
+                  : "text-green-600"
+          }`}
+        >
           {strength.label}
         </span>
       </div>
       <ul className="text-xs text-gray-500 space-y-1">
-        <li className={`flex items-center gap-1.5 ${password.length >= 8 ? "text-green-600" : ""}`}>
-          {password.length >= 8 ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+        <li
+          className={`flex items-center gap-1.5 ${password.length >= 8 ? "text-green-600" : ""}`}
+        >
+          {password.length >= 8 ? (
+            <Check className="w-3 h-3" />
+          ) : (
+            <X className="w-3 h-3" />
+          )}
           At least 8 characters
         </li>
-        <li className={`flex items-center gap-1.5 ${/[a-z]/.test(password) && /[A-Z]/.test(password) ? "text-green-600" : ""}`}>
-          {/[a-z]/.test(password) && /[A-Z]/.test(password) ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+        <li
+          className={`flex items-center gap-1.5 ${/[a-z]/.test(password) && /[A-Z]/.test(password) ? "text-green-600" : ""}`}
+        >
+          {/[a-z]/.test(password) && /[A-Z]/.test(password) ? (
+            <Check className="w-3 h-3" />
+          ) : (
+            <X className="w-3 h-3" />
+          )}
           Upper & lowercase letters
         </li>
-        <li className={`flex items-center gap-1.5 ${/\d/.test(password) ? "text-green-600" : ""}`}>
-          {/\d/.test(password) ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+        <li
+          className={`flex items-center gap-1.5 ${/\d/.test(password) ? "text-green-600" : ""}`}
+        >
+          {/\d/.test(password) ? (
+            <Check className="w-3 h-3" />
+          ) : (
+            <X className="w-3 h-3" />
+          )}
           At least one number
         </li>
-        <li className={`flex items-center gap-1.5 ${/[^a-zA-Z0-9]/.test(password) ? "text-green-600" : ""}`}>
-          {/[^a-zA-Z0-9]/.test(password) ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+        <li
+          className={`flex items-center gap-1.5 ${/[^a-zA-Z0-9]/.test(password) ? "text-green-600" : ""}`}
+        >
+          {/[^a-zA-Z0-9]/.test(password) ? (
+            <Check className="w-3 h-3" />
+          ) : (
+            <X className="w-3 h-3" />
+          )}
           Special character (!@#$%...)
         </li>
       </ul>

@@ -6,16 +6,16 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Check,
-  Feather,
   RotateCcw,
-  ShieldCheck,
+  Laptop,
 } from "lucide-react";
+import { BrandLogo } from "@/components/ui/brand";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
 
 const INITIAL = {
-  title: "Good ideas start here.",
+  title: "Good work starts with a clear idea.",
   content:
-    "<p>Every great project begins with a little space to think. This is yours. A quiet place to capture the first thought, find the right words, and turn an idea into something worth sharing.</p><h2>A little room to explore</h2><p>This is a real editor. Select a sentence, make it <strong>bold</strong>, or try a heading. Your changes stay in this browser, so you can pick up where you left off.</p><blockquote><p>The best work rarely starts with a perfect first draft. It starts with a first line.</p></blockquote><h2>Make yourself at home</h2><ul><li><p>Give this document a title of your own.</p></li><li><p>Try focus mode for a distraction-free view.</p></li><li><p>Download your work as a Markdown file.</p></li></ul><h2>Better, together</h2><p>Ready to bring someone into the process? Create an account to save documents to your workspace and share them with other registered collaborators.</p><p>Until then, take your time. There’s no wrong way to begin.</p>",
+    "<p>A shared starting point makes the next step easier. Use this document to collect the idea, work through the details, and give the project a little direction.</p><h2>The starting point</h2><p>What are we trying to make better? Write a short description of the problem and the people it matters to. A few clear sentences are a good place to begin.</p><h2>A plan worth sharing</h2><ul><li><p><strong>Define the outcome.</strong> Describe what success would look like.</p></li><li><p><strong>Make room for questions.</strong> Capture what you still need to learn.</p></li><li><p><strong>Choose a next step.</strong> Start with something small and useful.</p></li></ul><blockquote><p>A first draft gives an idea somewhere to go.</p></blockquote><h2>Make this document yours</h2><p>Try a heading, format a sentence, or replace this sample with your own work. This demo saves in this browser only. Download a Markdown copy whenever you need it.</p>",
 };
 const STORAGE_KEY = "collab-editor-demo-v1";
 const subscribeToClient = () => () => {};
@@ -47,7 +47,7 @@ export default function DemoPage() {
   return ready ? (
     <DemoWorkspace />
   ) : (
-    <div className="min-h-screen bg-[#f5f6f7]" aria-label="Loading demo" />
+    <div className="min-h-screen bg-[#f6f7fb]" aria-label="Loading demo" />
   );
 }
 function DemoWorkspace() {
@@ -75,35 +75,35 @@ function DemoWorkspace() {
     return () => window.removeEventListener("keydown", handleSave);
   }, []);
   return (
-    <div className="min-h-screen bg-[#f5f6f7]">
-      <header className="sticky top-0 z-30 h-[73px] border-b bg-white">
-        <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
-          <div className="flex min-w-0 items-center gap-4">
+    <div className="min-h-screen bg-[#f6f7fb] text-[#171923]">
+      <header className="sticky top-0 z-30 h-16 border-b border-[#e6e8ef] bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-3 px-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             <Link
               href="/"
               aria-label="Back to home"
-              className="rounded-md p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-900"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#626977] transition-colors hover:bg-[#f6f7fb] hover:text-[#171923] focus-visible:outline-2 focus-visible:outline-[#315bee]"
             >
               <ArrowLeft size={18} />
             </Link>
-            <Link
-              href="/"
-              className="hidden items-center gap-2 font-semibold tracking-tight text-[#162333] sm:flex"
-            >
-              <Feather className="text-teal-700" size={22} /> collab
-              <span className="text-teal-700">.</span>
+            <Link href="/" aria-label="Collab home" className="hidden sm:block">
+              <BrandLogo compact />
             </Link>
-            <span className="hidden h-5 w-px bg-slate-200 sm:block" />
-            <span className="rounded border border-teal-200 bg-teal-50 px-2.5 py-1 text-[11px] font-medium text-teal-800">
-              Demo workspace
+            <span
+              aria-hidden="true"
+              className="hidden h-6 w-px bg-[#e6e8ef] sm:block"
+            />
+            <span className="rounded-md border border-[#e0e6fb] bg-[#eef2ff] px-2.5 py-1 text-[11px] font-medium text-[#315bee]">
+              <span className="sm:hidden">Demo</span>
+              <span className="hidden sm:inline">Demo workspace</span>
             </span>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-4">
             <span
               role="status"
-              className="hidden items-center gap-1.5 text-xs text-slate-500 lg:flex"
+              className="hidden items-center gap-1.5 text-[11px] text-[#626977] lg:flex"
             >
-              <Check size={14} className="text-teal-700" />
+              <Check size={14} className="text-[#315bee]" />
               {storageAvailable
                 ? "Saved in this browser"
                 : "Browser storage unavailable"}
@@ -113,24 +113,26 @@ function DemoWorkspace() {
               aria-expanded={resetOpen}
               aria-label="Reset demo"
               title="Reset demo"
-              className="rounded-md p-2 text-slate-400 hover:bg-slate-50"
+              className="flex h-11 w-11 items-center justify-center rounded-xl text-[#626977] transition-colors hover:bg-[#f6f7fb] hover:text-[#171923] focus-visible:outline-2 focus-visible:outline-[#315bee]"
             >
               <RotateCcw size={16} />
             </button>
             <Link
               href="/login?mode=signup"
-              className="flex items-center gap-2 rounded-lg bg-[#167d72] px-3 py-2.5 text-xs font-medium text-white hover:bg-[#12695f] sm:px-4"
+              className="flex min-h-11 items-center gap-2 rounded-xl bg-[#315bee] px-3 text-xs font-semibold text-white shadow-[0_2px_6px_#315bee25] transition-colors hover:bg-[#244bd5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#315bee] sm:px-4"
             >
-              Create a workspace <ArrowUpRight size={14} />
+              <span className="sm:hidden">Sign up</span>
+              <span className="hidden sm:inline">Create a workspace</span>
+              <ArrowUpRight size={14} />
             </Link>
           </div>
         </div>
       </header>
       {resetOpen && (
-        <div className="flex flex-wrap items-center justify-center gap-4 border-b border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="flex flex-wrap items-center justify-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <p>Replace your demo draft with the sample document?</p>
           <button
-            className="font-semibold underline"
+            className="min-h-11 rounded-lg border border-amber-300 px-3 font-semibold"
             onClick={() => {
               updateDraft(INITIAL);
               setResetOpen(false);
@@ -138,23 +140,34 @@ function DemoWorkspace() {
           >
             Reset draft
           </button>
-          <button className="underline" onClick={() => setResetOpen(false)}>
+          <button
+            className="min-h-11 rounded-lg px-3 font-medium underline underline-offset-4"
+            onClick={() => setResetOpen(false)}
+          >
             Keep writing
           </button>
         </div>
       )}
-      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-2 px-6 py-5 text-xs text-slate-500">
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400">Workspace</span>
-          <span>/</span>
-          <span>Getting started</span>
-        </div>
-        <span className="flex items-center gap-1.5">
-          <ShieldCheck size={14} /> Local demo · only visible in this browser
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 text-[11px] text-[#626977] sm:px-8">
+        <span className="flex items-center gap-2">
+          <Laptop size={13} />
+          <span>Local demo</span>
+          <span aria-hidden="true" className="text-[#c3c7d0]">
+            /
+          </span>
+          <span className="font-medium text-[#4c5261]">Try the editor</span>
         </span>
-        <span role="status" className="flex w-full items-center gap-1.5 lg:hidden">
-          <Check size={14} className="text-teal-700" />
-          {storageAvailable ? "Saved in this browser" : "Browser storage unavailable"}
+        <span className="rounded-full border border-[#e6e8ef] bg-white px-2.5 py-1">
+          Local only · no cloud sync
+        </span>
+        <span
+          role="status"
+          className="flex w-full items-center gap-1.5 lg:hidden"
+        >
+          <Check size={13} className="text-[#315bee]" />
+          {storageAvailable
+            ? "Saved in this browser"
+            : "Browser storage unavailable"}
         </span>
       </div>
       {!storageAvailable && (
@@ -166,14 +179,12 @@ function DemoWorkspace() {
           copy before leaving.
         </p>
       )}
-      {
-        <TiptapEditor
-          title={draft.title}
-          content={draft.content}
-          onTitleChange={(title) => updateDraft({ ...draft, title })}
-          onUpdate={(content) => updateDraft({ ...draft, content })}
-        />
-      }
+      <TiptapEditor
+        title={draft.title}
+        content={draft.content}
+        onTitleChange={(title) => updateDraft({ ...draft, title })}
+        onUpdate={(content) => updateDraft({ ...draft, content })}
+      />
     </div>
   );
 }

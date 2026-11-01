@@ -4,7 +4,12 @@ import { forwardRef, ButtonHTMLAttributes, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
 type ButtonVariant =
-  "primary" | "secondary" | "outline" | "ghost" | "danger" | "oauth";
+  | "primary"
+  | "secondary"
+  | "outline"
+  | "ghost"
+  | "danger"
+  | "oauth";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -18,21 +23,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary: `
-    bg-gray-900 text-white
-    hover:bg-gray-800 active:bg-gray-950
-    focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2
+    bg-[#315BEE] text-white
+    hover:bg-[#2449D1] active:bg-[#203EA5]
+    focus-visible:ring-2 focus-visible:ring-[#315BEE] focus-visible:ring-offset-2
     disabled:bg-gray-300 disabled:text-gray-500
     shadow-sm hover:shadow
   `,
   secondary: `
-    bg-sky-500 text-white
-    hover:bg-sky-600 active:bg-sky-700
+    bg-[#191B23] text-white
+    hover:bg-[#2B2E3A] active:bg-[#101118]
     focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2
     disabled:bg-sky-200 disabled:text-sky-400
     shadow-sm hover:shadow
   `,
   outline: `
-    bg-white text-gray-700 border-2 border-gray-200
+    bg-white text-gray-700 border border-[#e6e8ef]
     hover:bg-gray-50 hover:border-gray-300 active:bg-gray-100
     focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2
     disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-200
@@ -61,8 +66,8 @@ const variantStyles: Record<ButtonVariant, string> = {
 
 const sizeStyles: Record<ButtonSize, string> = {
   sm: "px-3 py-2 text-sm gap-1.5 rounded-lg",
-  md: "px-4 py-2.5 text-sm gap-2 rounded-xl",
-  lg: "px-6 py-3.5 text-base gap-2.5 rounded-xl",
+  md: "px-4 py-2.5 text-sm gap-2 rounded-lg",
+  lg: "px-6 py-3.5 text-base gap-2.5 rounded-lg",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -89,7 +94,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         className={`
           inline-flex items-center justify-center
-          font-medium
+          font-semibold
           transition-all duration-200
           disabled:cursor-not-allowed
           ${variantStyles[variant]}
@@ -164,7 +169,7 @@ export function OAuthButton({
   return (
     <Button
       {...props}
-      variant={provider === "github" ? "primary" : "oauth"}
+      variant="oauth"
       size={size}
       fullWidth={fullWidth}
       loading={loading}

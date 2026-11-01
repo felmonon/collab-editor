@@ -3,7 +3,8 @@
 import { forwardRef, InputHTMLAttributes } from "react";
 import { Check } from "lucide-react";
 
-interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
+interface CheckboxProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label?: string;
 }
 
@@ -24,7 +25,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             className="peer sr-only"
             {...props}
           />
-          <div className="w-5 h-5 border-2 border-gray-300 rounded-md bg-white transition-all duration-200 peer-checked:bg-sky-500 peer-checked:border-sky-500 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-500 peer-focus-visible:ring-offset-2 peer-hover:border-gray-400 peer-checked:peer-hover:bg-sky-600 peer-checked:peer-hover:border-sky-600">
+          <div className="w-5 h-5 border-2 border-gray-300 rounded-md bg-white transition-all duration-200 peer-checked:bg-[#315BEE] peer-checked:border-[#315BEE] peer-focus-visible:ring-2 peer-focus-visible:ring-[#315BEE] peer-focus-visible:ring-offset-2 peer-hover:border-gray-400 peer-checked:peer-hover:bg-[#2449D1] peer-checked:peer-hover:border-[#2449D1]">
             <Check className="w-full h-full p-0.5 text-white opacity-0 transition-opacity duration-200 peer-checked:opacity-100" />
           </div>
           <Check className="absolute inset-0 w-full h-full p-0.5 text-white opacity-0 transition-opacity duration-200 peer-checked:opacity-100 pointer-events-none" />
@@ -36,7 +37,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
         )}
       </label>
     );
-  }
+  },
 );
 
 Checkbox.displayName = "Checkbox";

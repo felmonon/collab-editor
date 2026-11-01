@@ -1,247 +1,492 @@
 "use client";
 
+import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState, useCallback, useRef, useMemo, useEffectEvent } from "react";
-import { ArrowLeft, Loader2, Users, Check, Cloud, Wifi, WifiOff } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  Check,
+  CloudOff,
+  Feather,
+  Loader2,
+  LockKeyhole,
+  RefreshCw,
+  Share2,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
+import { ShareDialog } from "@/components/editor/share-dialog";
 import { useSocket } from "@/lib/socket/use-socket";
-import { RemoteCursors } from "@/components/editor/remote-cursors";
+import {
+  reconcileSavedDraft,
+  type EditorDraft,
+  type SavedEditorDraft,
+} from "@/lib/editor-save";
 
-interface Document {
+interface DocumentRecord {
   id: string;
   title: string;
   content: string | null;
-  owner: { name: string; image: string };
+  updatedAt: string;
+  canEdit: boolean;
+  isOwner: boolean;
 }
+type SaveStatus = "saved" | "unsaved" | "saving" | "error" | "conflict";
+const CONFLICT_MESSAGE =
+  "A collaborator saved a newer version. Your draft is still here. Download it before loading their changes.";
 
 export default function DocumentPage() {
-  const { data: session, status } = useSession();
+  const { id } = useParams<{ id: string }>();
+  return <DocumentRoom key={id} documentId={id} />;
+}
+
+function DocumentRoom({ documentId: id }: { documentId: string }) {
+  const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
-  const params = useParams();
-  const documentId = params.id as string;
-  const editorContainerRef = useRef<HTMLDivElement>(null);
-
-  const [document, setDocument] = useState<Document | null>(null);
+  const [record, setRecord] = useState<DocumentRecord | null>(null);
+  const [draft, setDraft] = useState<EditorDraft>({ title: "", content: "" });
+  const draftRef = useRef(draft);
+  const revisionRef = useRef("");
+  const dirtyRef = useRef(false);
+  const inFlightRef = useRef<AbortController | null>(null);
+  const pendingRemoteRef = useRef<SavedEditorDraft | null>(null);
+  const generationRef = useRef(0);
+  const loadingRef = useRef(true);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const isLocalUpdate = useRef(false);
+  const statusRef = useRef<SaveStatus>("saved");
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [reloadCount, setReloadCount] = useState(0);
+  const [sharing, setSharing] = useState(false);
+  function updateStatus(next: SaveStatus) {
+    statusRef.current = next;
+    setSaveStatus(next);
+  }
 
-  // Memoize user object to prevent socket reconnection
-  const socketUser = useMemo(() => ({
-    id: session?.user?.id || "",
-    name: session?.user?.name || "Anonymous",
-  }), [session?.user?.id, session?.user?.name]);
+  const handleRemoteContent = useCallback(
+    (content: string, updatedAt?: string, title?: string) => {
+      if (!updatedAt || updatedAt <= revisionRef.current) return;
+      const remote = {
+        content,
+        title: title ?? draftRef.current.title,
+        updatedAt,
+      };
+      if (
+        pendingRemoteRef.current &&
+        pendingRemoteRef.current.updatedAt >= updatedAt
+      )
+        return;
+      if (loadingRef.current || inFlightRef.current) {
+        // The pending HTTP response may be older than this notification.
+        pendingRemoteRef.current = remote;
+        return;
+      }
+      if (dirtyRef.current) {
+        pendingRemoteRef.current = remote;
+        statusRef.current = "conflict";
+        setSaveStatus("conflict");
+        setSaveError(CONFLICT_MESSAGE);
+        return;
+      }
+      revisionRef.current = updatedAt;
+      const next = { title: remote.title, content };
+      pendingRemoteRef.current = null;
+      draftRef.current = next;
+      setDraft(next);
+      statusRef.current = "saved";
+      setSaveStatus("saved");
+    },
+    [],
+  );
 
-  const handleRemoteContent = useCallback((newContent: string) => {
-    if (!isLocalUpdate.current) {
-      setContent(newContent);
-    }
-  }, []);
-
-  // Socket connection for real-time collaboration
-  const { connected, users, remoteCursors, sendUpdate, sendCursorPosition } = useSocket({
-    documentId,
-    user: socketUser,
+  const { connected, users, sendUpdate } = useSocket({
+    documentId: id,
+    user: { id: session?.user?.id || "", name: session?.user?.name || "You" },
+    enabled: Boolean(record && session?.user?.id),
     onDocumentUpdate: handleRemoteContent,
   });
 
-  // Track mouse movement and send cursor position
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (editorContainerRef.current) {
-        const rect = editorContainerRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+    if (sessionStatus === "unauthenticated")
+      router.replace(
+        `/login?callbackUrl=${encodeURIComponent(`/documents/${id}`)}`,
+      );
+  }, [sessionStatus, router, id]);
 
-        // Only send if mouse is within the editor container
-        if (x >= 0 && y >= 0 && x <= rect.width && y <= rect.height) {
-          sendCursorPosition(x, y);
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const controller = new AbortController();
+    const generation = ++generationRef.current;
+    loadingRef.current = true;
+    pendingRemoteRef.current = null;
+    inFlightRef.current?.abort();
+    inFlightRef.current = null;
+    async function load() {
+      try {
+        const res = await fetch(`/api/documents/${id}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok)
+          throw new Error(
+            res.status === 404
+              ? "This document is unavailable, or you don’t have access."
+              : "We couldn’t load this document. Please try again.",
+          );
+        const data: DocumentRecord = await res.json();
+        if (controller.signal.aborted || generation !== generationRef.current)
+          return;
+        const newerRemote =
+          pendingRemoteRef.current &&
+          pendingRemoteRef.current.updatedAt > data.updatedAt
+            ? pendingRemoteRef.current
+            : null;
+        const next = newerRemote
+          ? { title: newerRemote.title, content: newerRemote.content }
+          : {
+              title: data.title,
+              content: typeof data.content === "string" ? data.content : "",
+            };
+        pendingRemoteRef.current = null;
+        draftRef.current = next;
+        revisionRef.current = newerRemote?.updatedAt ?? data.updatedAt;
+        dirtyRef.current = false;
+        setDraft(next);
+        setRecord(data);
+        setLoadError("");
+        setSaveError("");
+        statusRef.current = "saved";
+        setSaveStatus("saved");
+      } catch (error) {
+        if (!controller.signal.aborted && generation === generationRef.current)
+          setLoadError(
+            error instanceof Error ? error.message : "Couldn’t load document.",
+          );
+      } finally {
+        if (
+          !controller.signal.aborted &&
+          generation === generationRef.current
+        ) {
+          loadingRef.current = false;
+          setLoading(false);
         }
       }
-    };
-
-    // Throttle mouse move events
-    let lastSent = 0;
-    const throttledMouseMove = (e: MouseEvent) => {
-      const now = Date.now();
-      if (now - lastSent > 50) { // Send at most every 50ms
-        lastSent = now;
-        handleMouseMove(e);
-      }
-    };
-
-    window.addEventListener("mousemove", throttledMouseMove);
-    return () => window.removeEventListener("mousemove", throttledMouseMove);
-  }, [sendCursorPosition]);
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
     }
-  }, [status, router]);
+    void load();
+    return () => {
+      controller.abort();
+      generationRef.current += 1;
+      inFlightRef.current?.abort();
+      inFlightRef.current = null;
+    };
+  }, [id, session?.user?.id, reloadCount]);
 
-  const fetchDocument = useEffectEvent(async () => {
-    const res = await fetch(`/api/documents/${documentId}`);
-    if (res.ok) {
+  const save = useCallback(async () => {
+    if (
+      loadingRef.current ||
+      !record?.canEdit ||
+      !dirtyRef.current ||
+      inFlightRef.current ||
+      statusRef.current === "conflict"
+    )
+      return;
+    const snapshot = { ...draftRef.current };
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    inFlightRef.current = controller;
+    statusRef.current = "saving";
+    setSaveStatus("saving");
+    setSaveError("");
+    try {
+      const res = await fetch(`/api/documents/${id}`, {
+        method: "PATCH",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...snapshot,
+          title: snapshot.title.trim() || "Untitled document",
+          expectedUpdatedAt: revisionRef.current,
+        }),
+      });
       const data = await res.json();
-      setDocument(data);
-      setTitle(data.title);
-      setContent(data.content || "");
-    } else {
-      router.push("/documents");
-    }
-    setLoading(false);
-  });
-
-  useEffect(() => {
-    if (session?.user && documentId) {
-      fetchDocument();
-    }
-  }, [documentId, session?.user]);
-
-  const saveDocument = useCallback(async () => {
-    if (!documentId) return;
-
-    setSaving(true);
-    await fetch(`/api/documents/${documentId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, content }),
-    });
-    setSaving(false);
-    setLastSaved(new Date());
-  }, [documentId, title, content]);
-
-  // Handle local content updates
-  const handleContentUpdate = useCallback((newContent: string) => {
-    isLocalUpdate.current = true;
-    setContent(newContent);
-    sendUpdate(newContent);
-
-    // Reset flag after a short delay
-    setTimeout(() => {
-      isLocalUpdate.current = false;
-    }, 100);
-  }, [sendUpdate]);
-
-  // Auto-save on content change (debounced)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (document && (title !== document.title || content !== document.content)) {
-        saveDocument();
+      if (controller.signal.aborted || generation !== generationRef.current)
+        return;
+      if (res.status === 409) {
+        statusRef.current = "conflict";
+        setSaveStatus("conflict");
+        setSaveError(
+          "A newer version was saved elsewhere. Your draft is still here. Download it before loading the latest version.",
+        );
+        return;
       }
-    }, 2000);
+      if (!res.ok)
+        throw new Error(
+          data.error || "Your changes couldn’t be saved. Please retry.",
+        );
+      const resolved = reconcileSavedDraft({
+        submitted: snapshot,
+        current: draftRef.current,
+        saved: {
+          title: data.title,
+          content:
+            typeof data.content === "string" ? data.content : snapshot.content,
+          updatedAt: data.updatedAt,
+        },
+        remote: pendingRemoteRef.current,
+      });
+      revisionRef.current = resolved.revision;
+      dirtyRef.current = resolved.dirty;
+      draftRef.current = resolved.draft;
+      setDraft(resolved.draft);
+      pendingRemoteRef.current = resolved.pendingRemote;
+      statusRef.current = resolved.status;
+      setSaveStatus(resolved.status);
+      setSaveError(resolved.status === "conflict" ? CONFLICT_MESSAGE : "");
+      sendUpdate(snapshot.content, data.updatedAt, data.title);
+    } catch (error) {
+      if (!controller.signal.aborted && generation === generationRef.current) {
+        const conflict = Boolean(
+          pendingRemoteRef.current &&
+          pendingRemoteRef.current.updatedAt > revisionRef.current,
+        );
+        statusRef.current = conflict ? "conflict" : "error";
+        setSaveStatus(statusRef.current);
+        setSaveError(
+          conflict
+            ? CONFLICT_MESSAGE
+            : error instanceof Error
+              ? error.message
+              : "Couldn’t save. Check your connection and retry.",
+        );
+      }
+    } finally {
+      if (inFlightRef.current === controller) inFlightRef.current = null;
+    }
+  }, [id, record?.canEdit, sendUpdate]);
 
+  useEffect(() => {
+    if (saveStatus !== "unsaved") return;
+    const timer = setTimeout(() => void save(), 1000);
     return () => clearTimeout(timer);
-  }, [title, content, document, saveDocument]);
+  }, [draft, saveStatus, save]);
 
-  if (status === "loading" || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-      </div>
-    );
+  useEffect(() => {
+    function beforeUnload(event: BeforeUnloadEvent) {
+      if (dirtyRef.current) {
+        event.preventDefault();
+      }
+    }
+    function keyboardSave(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key === "s") {
+        event.preventDefault();
+        void save();
+      }
+    }
+    function retryOnline() {
+      if (statusRef.current === "error") void save();
+    }
+    window.addEventListener("beforeunload", beforeUnload);
+    window.addEventListener("keydown", keyboardSave);
+    window.addEventListener("online", retryOnline);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      window.removeEventListener("keydown", keyboardSave);
+      window.removeEventListener("online", retryOnline);
+    };
+  }, [save]);
+
+  function edit(next: EditorDraft) {
+    if (loadingRef.current || !record?.canEdit) return;
+    draftRef.current = next;
+    dirtyRef.current = true;
+    setDraft(next);
+    if (statusRef.current !== "conflict" && statusRef.current !== "saving")
+      updateStatus("unsaved");
+  }
+  function leave() {
+    if (
+      dirtyRef.current &&
+      !window.confirm(
+        "Your latest changes haven’t been saved. Leave this document anyway?",
+      )
+    )
+      return;
+    router.push("/documents");
+  }
+  function reloadLatest() {
+    if (
+      dirtyRef.current &&
+      !window.confirm(
+        "Replace your local draft with the latest saved version? Download your draft first if you want to keep it.",
+      )
+    )
+      return;
+    loadingRef.current = true;
+    setLoading(true);
+    setReloadCount((count) => count + 1);
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push("/documents")}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+  if (loading)
+    return (
+      <div className="flex min-h-screen items-center justify-center gap-3 bg-[#f7f8fa] text-sm text-slate-500">
+        <Loader2 size={20} className="animate-spin text-teal-700" /> Opening
+        your document…
+      </div>
+    );
+  if (loadError)
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] p-6">
+        <div className="max-w-md text-center">
+          <CloudOff className="mx-auto mb-5 text-teal-700" size={36} />
+          <h1 className="text-2xl font-semibold">
+            Let’s get you back to writing.
+          </h1>
+          <p role="alert" className="my-4 text-sm leading-6 text-slate-500">
+            {loadError}
+          </p>
+          <div className="flex justify-center gap-3">
+            <Link
+              href="/documents"
+              className="rounded-lg border bg-white px-4 py-2 text-sm"
             >
-              <ArrowLeft className="w-5 h-5" />
+              All documents
+            </Link>
+            <button
+              onClick={() => setReloadCount((count) => count + 1)}
+              className="rounded-lg bg-teal-700 px-4 py-2 text-sm text-white"
+            >
+              Try again
             </button>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="text-lg font-semibold bg-transparent border-none focus:outline-none focus:ring-0"
-              placeholder="Untitled"
-            />
           </div>
+        </div>
+      </main>
+    );
+  if (!record)
+    return (
+      <div className="flex min-h-screen items-center justify-center gap-3 bg-[#f7f8fa] text-sm text-slate-500">
+        <Loader2 size={20} className="animate-spin text-teal-700" /> Opening
+        your document…
+      </div>
+    );
 
-          <div className="flex items-center gap-4">
-            {/* Connection status */}
-            <div className="flex items-center gap-1.5">
-              {connected ? (
-                <Wifi className="w-4 h-4 text-green-500" />
+  return (
+    <div className="min-h-screen bg-[#f5f6f7]">
+      <header className="sticky top-0 z-30 h-[73px] border-b bg-white">
+        <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
+          <div className="flex min-w-0 items-center gap-4">
+            <button
+              onClick={leave}
+              aria-label="Back to documents"
+              className="rounded-md p-2 text-slate-400 hover:bg-slate-50"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <span className="hidden items-center gap-2 font-semibold tracking-tight text-[#162333] sm:flex">
+              <Feather size={22} className="text-teal-700" /> collab
+              <span className="text-teal-700">.</span>
+            </span>
+            <span className="hidden h-5 w-px bg-slate-200 sm:block" />
+            <span className="max-w-[150px] truncate text-sm text-slate-600 sm:max-w-xs">
+              {draft.title || "Untitled document"}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+            <span
+              role="status"
+              aria-live="polite"
+              className={`hidden items-center gap-1.5 text-xs sm:flex ${saveStatus === "error" || saveStatus === "conflict" ? "text-amber-700" : "text-slate-500"}`}
+            >
+              {saveStatus === "saving" ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : saveStatus === "saved" ? (
+                <Check size={14} className="text-teal-700" />
               ) : (
-                <WifiOff className="w-4 h-4 text-red-500" />
+                <CloudOff size={14} />
               )}
-              <span className="text-xs text-gray-500">
-                {connected ? "Live" : "Offline"}
-              </span>
+              {!record.canEdit
+                ? "View only"
+                : {
+                    saved: "All changes saved",
+                    unsaved: "Unsaved changes",
+                    saving: "Saving…",
+                    error: "Not saved",
+                    conflict: "Review changes",
+                  }[saveStatus]}
+            </span>
+            <div
+              className="hidden -space-x-2 md:flex"
+              aria-label={`${users.length} connected collaborators`}
+            >
+              {users.slice(0, 3).map((user) => (
+                <span
+                  key={user.id}
+                  title={user.name}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-medium text-white"
+                  style={{ backgroundColor: user.color }}
+                >
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+              ))}
             </div>
-
-            {/* Save status */}
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              {saving ? (
-                <>
-                  <Cloud className="w-4 h-4 animate-pulse" />
-                  <span className="text-xs">Saving...</span>
-                </>
-              ) : lastSaved ? (
-                <>
-                  <Check className="w-4 h-4 text-green-500" />
-                  <span className="text-xs">Saved</span>
-                </>
-              ) : null}
-            </div>
-
-            {/* Collaborators */}
-            <div className="flex items-center">
-              <div className="flex -space-x-2">
-                {users.slice(0, 4).map((u, i) => (
-                  <div
-                    key={u.id}
-                    className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-medium"
-                    style={{ backgroundColor: u.color, zIndex: users.length - i }}
-                    title={u.name}
-                  >
-                    {u.name.charAt(0).toUpperCase()}
-                  </div>
-                ))}
-                {users.length > 4 && (
-                  <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium">
-                    +{users.length - 4}
-                  </div>
-                )}
-              </div>
-              <div className="ml-2 flex items-center gap-1 text-sm text-gray-500">
-                <Users className="w-4 h-4" />
-                <span>{users.length}</span>
-              </div>
-            </div>
-
-            {/* User avatar */}
-            {session?.user?.image ? (
-              <img
-                src={session.user.image}
-                alt=""
-                className="w-8 h-8 rounded-full ring-2 ring-blue-500"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium ring-2 ring-blue-300">
-                {session?.user?.name?.charAt(0).toUpperCase() || "?"}
-              </div>
+            {record.isOwner && (
+              <button
+                onClick={() => setSharing(true)}
+                className="flex items-center gap-2 rounded-lg bg-[#167d72] px-4 py-2.5 text-xs font-medium text-white hover:bg-[#12695f]"
+              >
+                <Share2 size={14} /> Share
+              </button>
             )}
           </div>
         </div>
       </header>
-
-      {/* Editor with cursor overlay */}
-      <main className="max-w-4xl mx-auto px-4 py-8 relative" ref={editorContainerRef}>
-        <RemoteCursors cursors={remoteCursors} />
-        <TiptapEditor content={content} onUpdate={handleContentUpdate} />
-      </main>
+      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-2 px-6 py-5 text-xs text-slate-500">
+        <span className="flex items-center gap-2">
+          <LockKeyhole size={13} />{" "}
+          {record.isOwner ? "Your workspace" : "Shared with you"}{" "}
+          <span className="mx-1 text-slate-300">/</span>{" "}
+          {record.canEdit ? "Editing" : "Viewing"}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {connected ? (
+            <Wifi size={14} className="text-teal-700" />
+          ) : (
+            <WifiOff size={14} />
+          )}
+          {connected
+            ? "Live collaboration connected"
+            : "Live collaboration unavailable"}
+        </span>
+      </div>
+      {saveError && (
+        <div
+          role="alert"
+          className="mx-auto mb-5 flex max-w-4xl flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          <p className="flex-1">{saveError}</p>
+          <button
+            disabled={saveStatus === "saving"}
+            onClick={
+              saveStatus === "conflict" ? reloadLatest : () => void save()
+            }
+            className="flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+          >
+            <RefreshCw size={13} />
+            {saveStatus === "conflict" ? "Load latest version" : "Retry save"}
+          </button>
+        </div>
+      )}
+      <TiptapEditor
+        content={draft.content}
+        title={draft.title}
+        onTitleChange={(title) => edit({ ...draftRef.current, title })}
+        onUpdate={(content) => edit({ ...draftRef.current, content })}
+        editable={record.canEdit}
+      />
+      {sharing && (
+        <ShareDialog documentId={id} onClose={() => setSharing(false)} />
+      )}
     </div>
   );
 }

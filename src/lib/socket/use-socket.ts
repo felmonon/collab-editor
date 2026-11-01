@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useEffectEvent,
+} from "react";
 import { io, Socket } from "socket.io-client";
 
 interface User {
   id: string;
+  userId?: string;
   name: string;
   color: string;
 }
-
 interface RemoteCursor {
   id: string;
   name: string;
@@ -16,104 +22,142 @@ interface RemoteCursor {
   x: number;
   y: number;
 }
-
+interface DocumentState {
+  content: string;
+  updatedAt?: string;
+  title?: string;
+}
 interface UseSocketProps {
   documentId: string;
   user: { id: string; name: string };
-  onDocumentUpdate?: (content: string) => void;
+  enabled?: boolean;
+  onDocumentUpdate?: (
+    content: string,
+    updatedAt?: string,
+    title?: string,
+  ) => void;
 }
 
 export function useSocket({
   documentId,
   user,
+  enabled = true,
   onDocumentUpdate,
 }: UseSocketProps) {
   const socketRef = useRef<Socket | null>(null);
+  const joinedRef = useRef(false);
   const [connected, setConnected] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [remoteCursors, setRemoteCursors] = useState<RemoteCursor[]>([]);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const notifyUpdate = useEffectEvent((state: DocumentState) => {
+    onDocumentUpdate?.(state.content, state.updatedAt, state.title);
+  });
 
   useEffect(() => {
-    // Connect to socket server
-    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001", {
+    if (!enabled || !documentId || !user.id) return;
+    const url =
+      process.env.NEXT_PUBLIC_SOCKET_URL ||
+      (process.env.NODE_ENV === "development"
+        ? "http://localhost:3001"
+        : undefined);
+    if (!url) return;
+    let active = true;
+    const controller = new AbortController();
+    const socket = io(url, {
       transports: ["websocket", "polling"],
-    });
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      setConnected(true);
-      // Join the document room
-      socket.emit("join-document", { documentId, user });
-    });
-
-    socket.on("disconnect", () => {
-      setConnected(false);
-    });
-
-    // Handle initial document state
-    socket.on("document-state", ({ content }) => {
-      if (onDocumentUpdate && content) {
-        onDocumentUpdate(content);
-      }
-    });
-
-    // Handle document updates from other users
-    socket.on("document-updated", ({ content }) => {
-      if (onDocumentUpdate) {
-        onDocumentUpdate(content);
-      }
-    });
-
-    // Handle user list updates
-    socket.on("users-updated", ({ users: updatedUsers }) => {
-      setUsers(updatedUsers);
-    });
-
-    // Handle cursor position updates from other users
-    socket.on("cursor-moved", (data: RemoteCursor) => {
-      setRemoteCursors((prev) => {
-        const existing = prev.findIndex((c) => c.id === data.id);
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = data;
-          return updated;
+      auth: async (callback) => {
+        try {
+          const response = await fetch(
+            `/api/documents/${encodeURIComponent(documentId)}/collaboration`,
+            { signal: controller.signal, cache: "no-store" },
+          );
+          const data = await response.json();
+          if (!response.ok)
+            throw new Error(data.error || "Unable to join live collaboration");
+          if (active) callback({ token: data.token });
+        } catch (error) {
+          if (!active) return;
+          setConnectionError(
+            error instanceof Error
+              ? error.message
+              : "Unable to join live collaboration",
+          );
+          callback({ token: "" });
         }
-        return [...prev, data];
-      });
+      },
     });
-
-    // Handle user leaving - remove their cursor
-    socket.on("user-left", ({ oderId }) => {
-      setRemoteCursors((prev) => prev.filter((c) => c.id !== oderId));
+    socketRef.current = socket;
+    socket.on("connect", () => socket.emit("join-document", { documentId }));
+    socket.on("document-state", (state: DocumentState) => {
+      joinedRef.current = true;
+      setConnected(true);
+      setConnectionError(null);
+      notifyUpdate(state);
     });
-
+    socket.on("document-updated", (state: DocumentState) =>
+      notifyUpdate(state),
+    );
+    socket.on("disconnect", () => {
+      joinedRef.current = false;
+      setConnected(false);
+      setUsers([]);
+      setRemoteCursors([]);
+    });
+    socket.on("connect_error", (error: Error) => {
+      joinedRef.current = false;
+      setConnected(false);
+      setConnectionError(error.message);
+    });
+    socket.on("collaboration-error", ({ message }: { message: string }) => {
+      setConnectionError(message);
+    });
+    socket.on("users-updated", ({ users: nextUsers }: { users: User[] }) =>
+      setUsers(nextUsers),
+    );
+    socket.on("cursor-moved", (cursor: RemoteCursor) => {
+      setRemoteCursors((current) => [
+        ...current.filter((item) => item.id !== cursor.id),
+        cursor,
+      ]);
+    });
+    socket.on("user-left", ({ id }: { id: string }) =>
+      setRemoteCursors((current) =>
+        current.filter((cursor) => cursor.id !== id),
+      ),
+    );
     return () => {
+      active = false;
+      controller.abort();
+      joinedRef.current = false;
       socket.disconnect();
+      socketRef.current = null;
     };
-  }, [documentId, user, onDocumentUpdate]);
+  }, [documentId, user.id, enabled]);
 
-  const sendUpdate = useCallback((content: string) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("document-update", {
-        documentId,
-        content,
-        version: Date.now(),
-      });
+  const sendUpdate = useCallback<
+    (content: string, updatedAt?: string, title?: string) => void
+  >(() => {
+    if (joinedRef.current && socketRef.current?.connected) {
+      // Content is read from the database by the server, never trusted from a client.
+      socketRef.current.emit("document-update", { documentId });
     }
   }, [documentId]);
-
-  const sendCursorPosition = useCallback((x: number, y: number) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("cursor-move", { documentId, x, y });
-    }
-  }, [documentId]);
-
+  const sendCursorPosition = useCallback(
+    (x: number, y: number) => {
+      if (joinedRef.current && socketRef.current?.connected)
+        socketRef.current.emit("cursor-move", { documentId, x, y });
+    },
+    [documentId],
+  );
+  const reconnect = useCallback(() => socketRef.current?.connect(), []);
   return {
-    connected,
+    connected: enabled && connected,
     users,
     remoteCursors,
     sendUpdate,
     sendCursorPosition,
+    connectionError,
+    reconnect,
   };
 }

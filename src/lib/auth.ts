@@ -20,15 +20,23 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password required");
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+        const user = await prisma.user.findFirst({
+          where: {
+            email: {
+              equals: credentials.email.trim().toLowerCase(),
+              mode: "insensitive",
+            },
+          },
         });
 
         if (!user || !user.password) {
           throw new Error("Invalid email or password");
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.password);
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password,
+        );
 
         if (!isValid) {
           throw new Error("Invalid email or password");
@@ -42,14 +50,22 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    GithubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_ID!,
-      clientSecret: process.env.GOOGLE_SECRET!,
-    }),
+    ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
+      ? [
+          GithubProvider({
+            clientId: process.env.GITHUB_ID,
+            clientSecret: process.env.GITHUB_SECRET,
+          }),
+        ]
+      : []),
+    ...(process.env.GOOGLE_ID && process.env.GOOGLE_SECRET
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_ID,
+            clientSecret: process.env.GOOGLE_SECRET,
+          }),
+        ]
+      : []),
   ],
   session: {
     strategy: "jwt",

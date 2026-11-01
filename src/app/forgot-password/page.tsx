@@ -1,143 +1,54 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail, FileText, CheckCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/toast";
-
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { ArrowLeft, ArrowRight, KeyRound, PenLine } from "lucide-react";
 
 export default function ForgotPasswordPage() {
-  const { addToast } = useToast();
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!email) {
-      setError("Email is required");
-      return;
-    }
-
-    if (!emailRegex.test(email)) {
-      setError("Please enter a valid email address");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    // Simulate API call - in production, this would call your password reset endpoint
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setSubmitted(true);
-      addToast("Password reset email sent!", "success");
-    } catch {
-      addToast("Failed to send reset email. Please try again.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-sky-50 via-white to-gray-50">
-        <div className="w-full max-w-md text-center space-y-6 animate-fade-in-up">
-          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-          </div>
-
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Check your email</h1>
-            <p className="mt-2 text-gray-600">
-              We&apos;ve sent a password reset link to{" "}
-              <span className="font-medium text-gray-900">{email}</span>
-            </p>
-          </div>
-
-          <div className="p-4 bg-sky-50 rounded-xl border border-sky-100">
-            <p className="text-sm text-sky-700">
-              Didn&apos;t receive the email? Check your spam folder or{" "}
-              <button
-                onClick={() => setSubmitted(false)}
-                className="font-medium underline hover:no-underline"
-              >
-                try another email address
-              </button>
-            </p>
-          </div>
-
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to sign in
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-sky-50 via-white to-gray-50">
-      <div className="w-full max-w-md space-y-8 animate-fade-in">
-        {/* Logo */}
-        <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="p-2 bg-gray-900 rounded-xl">
-              <FileText className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold">Collab Editor</span>
-          </Link>
-        </div>
-
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Forgot your password?</h1>
-          <p className="mt-2 text-gray-600">
-            No worries! Enter your email and we&apos;ll send you a reset link.
+    <main className="flex min-h-screen flex-col bg-[#faf9f6] px-6 py-8 text-[#162333]">
+      <Link
+        href="/"
+        className="mx-auto flex items-center gap-2.5 text-lg font-semibold"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#162333] text-white">
+          <PenLine className="h-5 w-5" />
+        </span>
+        Collab Editor
+      </Link>
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-14">
+        <span className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-[#d5e2d8] bg-[#edf3ed] text-[#167d72]">
+          <KeyRound className="h-6 w-6" strokeWidth={1.5} />
+        </span>
+        <h1
+          className="text-3xl tracking-tight"
+          style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+        >
+          Let’s get you back in.
+        </h1>
+        <p className="mt-4 text-sm leading-7 text-[#63707a]">
+          If you registered with Google or GitHub, return to sign in and choose
+          that same provider. You don’t need a separate Collab Editor password.
+        </p>
+        <div className="my-6 rounded-xl border border-[#e0e5dd] bg-white p-5">
+          <h2 className="text-sm font-semibold">
+            Forgot an email account password?
+          </h2>
+          <p className="mt-2 text-sm leading-7 text-[#63707a]">
+            Password reset emails aren’t available yet. Contact the person who
+            runs this workspace for help recovering access.
           </p>
         </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <Input
-            label="Email Address"
-            type="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (error) setError("");
-            }}
-            error={error}
-            placeholder="you@example.com"
-            autoComplete="email"
-            icon={<Mail className="w-5 h-5" />}
-            required
-          />
-
-          <Button type="submit" fullWidth size="lg" loading={loading}>
-            Send Reset Link
-          </Button>
-        </form>
-
-        {/* Back Link */}
-        <div className="text-center">
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to sign in
-          </Link>
-        </div>
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#167d72] px-5 py-3.5 text-sm font-semibold text-white hover:bg-[#10665d]"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to sign in
+        </Link>
+        <Link
+          href="/demo"
+          className="mt-5 inline-flex items-center justify-center gap-2 text-xs font-medium text-[#63707a] hover:text-[#167d72]"
+        >
+          Keep writing in a local draft <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
-    </div>
+    </main>
   );
 }

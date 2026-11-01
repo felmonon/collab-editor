@@ -1,465 +1,527 @@
 "use client";
 
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useEffectEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Plus,
+  AlertCircle,
+  ArrowRight,
+  ChevronRight,
+  FilePlus2,
   FileText,
-  LogOut,
-  Loader2,
-  Search,
-  MoreVertical,
-  Trash2,
-  Edit3,
-  Clock,
-  User,
-  ChevronDown,
-  Grid,
+  FolderOpen,
+  LayoutGrid,
   List,
-  Sparkles,
+  Loader2,
+  LogOut,
+  Plus,
+  RefreshCw,
+  Search,
+  Users,
+  X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import {
+  DocumentCollection,
+  Initials,
+  type WorkspaceDocument,
+} from "@/components/documents/document-collection";
+import {
+  DocumentTemplates,
+  documentTemplates,
+  type DocumentTemplate,
+} from "@/components/documents/document-templates";
+import { DeleteDocumentDialog } from "@/components/documents/delete-document-dialog";
 
-interface Document {
-  id: string;
-  title: string;
-  updatedAt: string;
-  owner: { name: string; image: string };
-}
+type Filter = "all" | "mine" | "shared";
+type Sort = "updated" | "oldest" | "name";
+
+const filters: { id: Filter; label: string; icon: typeof FileText }[] = [
+  { id: "all", label: "All documents", icon: FolderOpen },
+  { id: "mine", label: "Created by me", icon: FileText },
+  { id: "shared", label: "Shared with me", icon: Users },
+];
 
 export default function DocumentsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { addToast } = useToast();
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<WorkspaceDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<Sort>("updated");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [documentToDelete, setDocumentToDelete] =
+    useState<WorkspaceDocument | null>(null);
+  const userId = session?.user?.id;
+  const userName = session?.user?.name || "Your workspace";
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
+    if (status === "unauthenticated") router.replace("/login");
   }, [status, router]);
 
-  const fetchDocuments = useEffectEvent(async () => {
-    try {
-      const res = await fetch("/api/documents");
-      if (res.ok) {
-        const data = await res.json();
-        setDocuments(data);
-      }
-    } catch {
-      addToast("Failed to load documents", "error");
-    } finally {
-      setLoading(false);
-    }
-  });
-
-  useEffect(() => {
-    if (session?.user) {
-      fetchDocuments();
-    }
-  }, [session?.user]);
-
-  const createDocument = async () => {
-    setCreating(true);
-    try {
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "Untitled Document" }),
-      });
-
-      if (res.ok) {
-        const doc = await res.json();
-        addToast("Document created!", "success");
-        router.push(`/documents/${doc.id}`);
-      } else {
-        addToast("Failed to create document", "error");
-      }
-    } catch {
-      addToast("Failed to create document", "error");
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const deleteDocument = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setOpenMenuId(null);
-
-    try {
-      const res = await fetch(`/api/documents/${id}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setDocuments((prev) => prev.filter((doc) => doc.id !== id));
-        addToast("Document deleted", "success");
-      } else {
-        addToast("Failed to delete document", "error");
-      }
-    } catch {
-      addToast("Failed to delete document", "error");
-    }
-  };
-
-  const filteredDocuments = documents.filter((doc) =>
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const fetchDocuments = useCallback(
+    (signal?: AbortSignal) => {
+      return fetch("/api/documents", { signal })
+        .then(async (response) => {
+          if (response.status === 401) {
+            router.replace("/login");
+            return;
+          }
+          if (!response.ok) throw new Error("Failed to load documents");
+          const data = await response.json();
+          if (!Array.isArray(data)) throw new Error("Unexpected response");
+          if (signal?.aborted) return;
+          setDocuments(data);
+          setError("");
+        })
+        .catch(() => {
+          if (!signal?.aborted)
+            setError(
+              "Your documents couldn’t be loaded. Check your connection and try again.",
+            );
+        })
+        .finally(() => {
+          if (!signal?.aborted) setLoading(false);
+        });
+    },
+    [router],
   );
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  useEffect(() => {
+    if (!userId) return;
+    const controller = new AbortController();
+    void fetchDocuments(controller.signal);
+    return () => controller.abort();
+  }, [userId, fetchDocuments]);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+  const createDocument = async (
+    template: DocumentTemplate = documentTemplates[0],
+  ) => {
+    if (creating) return;
+    setCreating(template.id);
+    try {
+      const response = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: template.documentTitle,
+          content: template.content,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to create document");
+      const document = await response.json();
+      router.push(`/documents/${document.id}`);
+    } catch {
+      addToast("Your document couldn’t be created. Please try again.", "error");
+      setCreating(null);
+    }
   };
 
-  if (status === "loading" || loading) {
+  const counts = useMemo(
+    () => ({
+      all: documents.length,
+      mine: documents.filter((document) => document.ownerId === userId).length,
+      shared: documents.filter((document) => document.ownerId !== userId)
+        .length,
+    }),
+    [documents, userId],
+  );
+
+  const filteredDocuments = useMemo(
+    () =>
+      documents
+        .filter(
+          (document) =>
+            (filter === "all" ||
+              (filter === "mine"
+                ? document.ownerId === userId
+                : document.ownerId !== userId)) &&
+            document.title
+              .toLocaleLowerCase()
+              .includes(searchQuery.trim().toLocaleLowerCase()),
+        )
+        .sort((a, b) =>
+          sort === "name"
+            ? a.title.localeCompare(b.title)
+            : sort === "oldest"
+              ? new Date(a.updatedAt).getTime() -
+                new Date(b.updatedAt).getTime()
+              : new Date(b.updatedAt).getTime() -
+                new Date(a.updatedAt).getTime(),
+        ),
+    [documents, filter, searchQuery, sort, userId],
+  );
+
+  const currentLabel =
+    filters.find((item) => item.id === filter)?.label || "All documents";
+
+  if (status !== "authenticated")
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-sky-500 mx-auto mb-4" />
-          <p className="text-gray-500">Loading your documents...</p>
-        </div>
+      <div
+        role="status"
+        className="flex min-h-screen items-center justify-center gap-3 bg-[#f7f8fa] text-sm text-slate-500"
+      >
+        <Loader2
+          className="h-5 w-5 animate-spin text-[#167d72]"
+          aria-hidden="true"
+        />
+        Opening your workspace…
       </div>
     );
-  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-900 rounded-xl">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="text-xl font-bold">Collab Editor</h1>
-            </div>
-
-            <div className="flex items-center gap-4">
-              {/* User Menu */}
-              <div className="relative group">
-                <button className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-100 transition-colors">
-                  {session?.user?.image ? (
-                    <img
-                      src={session.user.image}
-                      alt=""
-                      className="w-8 h-8 rounded-full ring-2 ring-gray-100"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-purple-500 flex items-center justify-center">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium text-gray-900">{session?.user?.name}</p>
-                    <p className="text-xs text-gray-500">{session?.user?.email}</p>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                </button>
-
-                {/* Dropdown */}
-                <div className="absolute right-0 top-full mt-2 w-56 py-2 bg-white rounded-xl shadow-lg border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <div className="px-4 py-2 border-b">
-                    <p className="text-sm font-medium text-gray-900">{session?.user?.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{session?.user?.email}</p>
-                  </div>
-                  <button
-                    onClick={() => signOut({ callbackUrl: "/login" })}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign out
-                  </button>
-                </div>
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#f7f8fa] text-[#162333] lg:pl-60">
+      <a
+        href="#documents-main"
+        className="sr-only z-50 rounded-lg bg-white p-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
+        Skip to documents
+      </a>
+      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-[#e3e7eb] bg-white lg:flex">
+        <Link
+          href="/"
+          className="focus-ring mx-6 my-8 flex items-center gap-2.5 rounded-lg text-lg font-semibold tracking-tight"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#167d72] text-white">
+            <FileText className="h-5 w-5" aria-hidden="true" />
+          </span>
+          collab
+          <span className="-ml-1.5 font-normal text-slate-400">editor</span>
+        </Link>
+        <div className="mx-4 rounded-xl border border-slate-200 bg-[#f8faf9] px-3 py-3.5">
+          <p className="truncate text-sm font-semibold">Personal workspace</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Ideas come together here
+          </p>
+        </div>
+        <nav aria-label="Document navigation" className="mt-8 px-3">
+          <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-400">
+            Workspace
+          </p>
+          {filters.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setFilter(id)}
+              aria-pressed={filter === id}
+              className={`focus-ring mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors ${filter === id ? "bg-[#eaf3f1] font-medium text-[#167d72]" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+              {label}
+              <span className="ml-auto text-xs tabular-nums">
+                {loading || error ? "—" : counts[id]}
+              </span>
+            </button>
+          ))}
+        </nav>
+        <div className="mx-6 mt-auto mb-6 border-t border-slate-100 pt-6">
+          <p className="text-sm font-medium">Good ideas start with a page.</p>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Make a draft, find your words, and bring your team into the
+            conversation.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 border-t border-slate-200 px-5 py-5">
+          <Initials name={userName} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold">{userName}</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-500">
+              {session?.user?.email}
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            aria-label="Sign out"
+            title="Sign out"
+            className="focus-ring rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      </aside>
+
+      <header className="flex min-h-20 items-center justify-between gap-3 border-b border-[#e3e7eb] bg-white px-5 sm:px-8 lg:px-10">
+        <div className="flex items-center gap-2.5 text-sm">
+          <Link
+            href="/"
+            className="focus-ring flex items-center gap-2 rounded-md font-semibold lg:hidden"
+          >
+            <FileText className="h-5 w-5 text-[#167d72]" aria-hidden="true" />
+            collab editor
+          </Link>
+          <span className="hidden text-slate-500 lg:inline">Workspace</span>
+          <ChevronRight
+            className="hidden h-3.5 w-3.5 text-slate-300 lg:inline"
+            aria-hidden="true"
+          />
+          <span className="hidden font-medium lg:inline">Documents</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="hidden text-xs text-slate-500 sm:inline">
+            Your next great idea starts here.
+          </span>
+          <Initials name={userName} />
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            aria-label="Sign out"
+            className="focus-ring rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Title & Actions */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+      <main
+        id="documents-main"
+        className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Your Documents</h2>
-            <p className="text-gray-500 mt-1">
-              {documents.length} document{documents.length !== 1 ? "s" : ""}
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#167d72]">
+              A space for your ideas
+            </p>
+            <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.035em] sm:text-4xl">
+              Let’s make something together.
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              A fresh page or a work in progress. Pick up wherever inspiration
+              finds you.
             </p>
           </div>
-
-          <Button
-            onClick={createDocument}
-            loading={creating}
-            icon={<Plus className="w-4 h-4" />}
+          <button
+            type="button"
+            disabled={creating !== null}
+            onClick={() => createDocument()}
+            className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg bg-[#167d72] px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#11675e] disabled:cursor-wait disabled:opacity-60"
           >
-            New Document
-          </Button>
+            {creating === "blank" ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Plus className="h-4 w-4" aria-hidden="true" />
+            )}
+            {creating === "blank" ? "Creating…" : "New document"}
+          </button>
         </div>
 
-        {/* Search & View Toggle */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 max-w-md">
-            <Input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search documents..."
-              icon={<Search className="w-5 h-5" />}
-            />
-          </div>
+        <DocumentTemplates creating={creating} onCreate={createDocument} />
 
-          <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`p-2 rounded-md transition-colors ${
-                viewMode === "grid" ? "bg-white shadow-sm" : "hover:bg-gray-200"
-              }`}
-              aria-label="Grid view"
-            >
-              <Grid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-2 rounded-md transition-colors ${
-                viewMode === "list" ? "bg-white shadow-sm" : "hover:bg-gray-200"
-              }`}
-              aria-label="List view"
-            >
-              <List className="w-4 h-4" />
-            </button>
+        <section aria-labelledby="documents-title" className="mt-11">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <h2
+                id="documents-title"
+                className="text-lg font-semibold tracking-tight"
+              >
+                {currentLabel}
+              </h2>
+              {!loading && !error && (
+                <span className="rounded-md bg-[#e9edef] px-2 py-0.5 text-xs font-medium text-slate-600">
+                  {counts[filter]}
+                </span>
+              )}
+            </div>
+            <p aria-live="polite" className="text-xs text-slate-500">
+              {!loading &&
+                !error &&
+                (searchQuery.trim()
+                  ? `${filteredDocuments.length} result${filteredDocuments.length !== 1 ? "s" : ""}`
+                  : "Your words, all in one place")}
+            </p>
           </div>
-        </div>
-
-        {/* Documents */}
-        {filteredDocuments.length === 0 ? (
-          <div className="text-center py-20">
-            {searchQuery ? (
-              <>
-                <Search className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 text-lg">No documents match &quot;{searchQuery}&quot;</p>
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+            {filters.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={filter === id}
+                onClick={() => setFilter(id)}
+                className={`focus-ring shrink-0 rounded-lg border px-3 py-2 text-xs ${filter === id ? "border-[#bbd5cf] bg-[#eaf3f1] font-medium text-[#167d72]" : "border-slate-200 bg-white text-slate-500"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="mb-5 flex flex-wrap items-center gap-3">
+            <div className="relative min-w-0 flex-1 basis-60 sm:max-w-sm">
+              <Search
+                className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-slate-400"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                aria-label="Search documents"
+                placeholder="Search your documents…"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="focus-ring h-10 w-full rounded-lg border border-[#e0e5e9] bg-white pr-10 pl-10 text-sm placeholder:text-slate-400"
+              />
+              {searchQuery && (
                 <button
+                  type="button"
+                  aria-label="Clear search"
                   onClick={() => setSearchQuery("")}
-                  className="mt-2 text-sky-600 hover:underline"
+                  className="focus-ring absolute top-2 right-2 rounded p-1 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            <div className="flex flex-1 items-center justify-end gap-2 sm:ml-auto sm:flex-none">
+              <label htmlFor="document-sort" className="sr-only">
+                Sort documents
+              </label>
+              <select
+                id="document-sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as Sort)}
+                className="focus-ring h-10 max-w-full rounded-lg border border-[#e0e5e9] bg-white px-3 text-xs text-slate-600"
+              >
+                <option value="updated">Last edited</option>
+                <option value="oldest">Oldest first</option>
+                <option value="name">Name: A–Z</option>
+              </select>
+              <div className="flex h-10 items-center gap-0.5 rounded-lg border border-[#e0e5e9] bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  aria-label="Grid view"
+                  aria-pressed={viewMode === "grid"}
+                  className={`focus-ring rounded-md p-1.5 ${viewMode === "grid" ? "bg-[#eaf3f1] text-[#167d72]" : "text-slate-400 hover:bg-slate-50"}`}
+                >
+                  <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  aria-label="List view"
+                  aria-pressed={viewMode === "list"}
+                  className={`focus-ring rounded-md p-1.5 ${viewMode === "list" ? "bg-[#eaf3f1] text-[#167d72]" : "text-slate-400 hover:bg-slate-50"}`}
+                >
+                  <List className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div
+              role="status"
+              aria-label="Loading documents"
+              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            >
+              {[0, 1, 2].map((item) => (
+                <div
+                  key={item}
+                  aria-hidden="true"
+                  className="h-60 animate-pulse rounded-xl border border-slate-200 bg-white p-6"
+                >
+                  <div className="mb-7 h-10 w-9 rounded-lg bg-slate-100" />
+                  <div className="mb-3 h-4 w-3/4 rounded bg-slate-100" />
+                  <div className="mb-2 h-3 w-full rounded bg-slate-50" />
+                  <div className="h-3 w-2/3 rounded bg-slate-50" />
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-slate-200 bg-white px-6 py-14 text-center"
+            >
+              <AlertCircle
+                className="mx-auto mb-4 h-8 w-8 text-amber-600"
+                aria-hidden="true"
+              />
+              <h3 className="font-semibold">Let’s try that again.</h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoading(true);
+                  void fetchDocuments();
+                }}
+                className="focus-ring mt-5 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium hover:bg-slate-50"
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Try again
+              </button>
+            </div>
+          ) : filteredDocuments.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[#d5dfdc] bg-white/70 px-6 py-14 text-center">
+              <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf3f1] text-[#167d72]">
+                {searchQuery.trim() ? (
+                  <Search className="h-6 w-6" aria-hidden="true" />
+                ) : filter === "shared" ? (
+                  <Users className="h-6 w-6" aria-hidden="true" />
+                ) : (
+                  <FilePlus2 className="h-6 w-6" aria-hidden="true" />
+                )}
+              </span>
+              <h3 className="text-lg font-semibold">
+                {searchQuery.trim()
+                  ? "No matching documents"
+                  : filter === "shared"
+                    ? "Good work is better together."
+                    : "Your next chapter starts here."}
+              </h3>
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                {searchQuery.trim()
+                  ? `We couldn’t find a document named “${searchQuery.trim()}”. Try a different title.`
+                  : filter === "shared"
+                    ? "When someone shares a document with your account, you’ll find it right here."
+                    : "Start with a blank page, or use a template to give your ideas a head start."}
+              </p>
+              {searchQuery.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="focus-ring mt-5 rounded-lg px-3 py-2 text-sm font-medium text-[#167d72] hover:bg-[#eaf3f1]"
                 >
                   Clear search
                 </button>
-              </>
-            ) : (
-              <div className="max-w-md mx-auto">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-sky-100 to-purple-100 rounded-2xl flex items-center justify-center">
-                  <Sparkles className="w-10 h-10 text-sky-500" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Create your first document
-                </h3>
-                <p className="text-gray-500 mb-6">
-                  Start writing and collaborating with your team in real-time.
-                </p>
-                <Button
-                  onClick={createDocument}
-                  loading={creating}
-                  icon={<Plus className="w-4 h-4" />}
-                  size="lg"
-                >
-                  New Document
-                </Button>
-              </div>
-            )}
-          </div>
-        ) : viewMode === "grid" ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                onClick={() => router.push(`/documents/${doc.id}`)}
-                className="group relative bg-white rounded-xl border hover:shadow-lg hover:border-sky-200 transition-all duration-200 cursor-pointer overflow-hidden"
-              >
-                {/* Preview Area */}
-                <div className="p-6 pb-4">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-2 bg-gray-100 rounded-lg group-hover:bg-sky-100 transition-colors">
-                      <FileText className="w-5 h-5 text-gray-600 group-hover:text-sky-600 transition-colors" />
-                    </div>
-
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(openMenuId === doc.id ? null : doc.id);
-                        }}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <MoreVertical className="w-4 h-4 text-gray-400" />
-                      </button>
-
-                      {openMenuId === doc.id && (
-                        <div className="absolute right-0 top-full mt-1 w-40 py-1 bg-white rounded-lg shadow-lg border z-10">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/documents/${doc.id}`);
-                            }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                            Edit
-                          </button>
-                          <button
-                            onClick={(e) => deleteDocument(doc.id, e)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <h3 className="font-semibold text-gray-900 mb-1 truncate group-hover:text-sky-600 transition-colors">
-                    {doc.title}
-                  </h3>
-
-                  <div className="flex items-center gap-3 text-sm text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      {formatDate(doc.updatedAt)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Bar */}
-                <div className="px-6 py-3 bg-gray-50 border-t flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {doc.owner.image ? (
-                      <img
-                        src={doc.owner.image}
-                        alt=""
-                        className="w-6 h-6 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-sky-400 to-purple-500" />
-                    )}
-                    <span className="text-xs text-gray-500">{doc.owner.name}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                    Owner
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                    Last Modified
-                  </th>
-                  <th className="w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredDocuments.map((doc) => (
-                  <tr
-                    key={doc.id}
-                    onClick={() => router.push(`/documents/${doc.id}`)}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+              ) : (
+                filter !== "shared" && (
+                  <button
+                    type="button"
+                    disabled={creating !== null}
+                    onClick={() => createDocument()}
+                    className="focus-ring mt-5 inline-flex items-center gap-2 rounded-lg bg-[#167d72] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#11675e] disabled:opacity-60"
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-gray-400" />
-                        <span className="font-medium text-gray-900">{doc.title}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 hidden sm:table-cell">
-                      <div className="flex items-center gap-2">
-                        {doc.owner.image ? (
-                          <img
-                            src={doc.owner.image}
-                            alt=""
-                            className="w-6 h-6 rounded-full"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-sky-400 to-purple-500" />
-                        )}
-                        <span className="text-sm text-gray-600">{doc.owner.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 hidden md:table-cell">
-                      <span className="text-sm text-gray-500">{formatDate(doc.updatedAt)}</span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="relative">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(openMenuId === doc.id ? null : doc.id);
-                          }}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-                        >
-                          <MoreVertical className="w-4 h-4 text-gray-400" />
-                        </button>
-
-                        {openMenuId === doc.id && (
-                          <div className="absolute right-0 top-full mt-1 w-40 py-1 bg-white rounded-lg shadow-lg border z-10">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/documents/${doc.id}`);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                              Edit
-                            </button>
-                            <button
-                              onClick={(e) => deleteDocument(doc.id, e)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    Create your first document
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )
+              )}
+            </div>
+          ) : (
+            <DocumentCollection
+              documents={filteredDocuments}
+              viewMode={viewMode}
+              userId={userId || ""}
+              onDelete={setDocumentToDelete}
+            />
+          )}
+        </section>
       </main>
-
-      {/* Click outside to close menu */}
-      {openMenuId && (
-        <div
-          className="fixed inset-0 z-30"
-          onClick={() => setOpenMenuId(null)}
+      {documentToDelete && (
+        <DeleteDocumentDialog
+          document={documentToDelete}
+          onClose={() => setDocumentToDelete(null)}
+          onDeleted={(id) => {
+            setDocuments((previous) =>
+              previous.filter((document) => document.id !== id),
+            );
+            setDocumentToDelete(null);
+            addToast("Document deleted", "success");
+          }}
         />
       )}
     </div>

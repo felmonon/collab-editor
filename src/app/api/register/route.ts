@@ -1,59 +1,41 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { parseRegistration } from "@/lib/documents/validation";
+import { apiError } from "@/lib/documents/api-error";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { name, email, password } = body;
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
-    }
-
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
-        { status: 400 }
-      );
-    }
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    const { name, email, password } = parseRegistration(await request.json());
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: { id: true },
     });
-
-    if (existingUser) {
+    if (existingUser)
       return NextResponse.json(
-        { error: "User with this email already exists" },
-        { status: 400 }
+        { error: "An account with this email already exists. Try signing in." },
+        { status: 409 },
       );
-    }
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Create user
     const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-      },
+      data: { name, email, password: hashedPassword },
+      select: { id: true },
     });
-
     return NextResponse.json(
-      { message: "User created successfully", userId: user.id },
-      { status: 201 }
+      { message: "Account created", userId: user.id },
+      { status: 201 },
     );
   } catch (error) {
-    console.error("Registration error:", error);
-    return NextResponse.json(
-      { error: "Something went wrong" },
-      { status: 500 }
-    );
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "An account with this email already exists. Try signing in." },
+        { status: 409 },
+      );
+    }
+    return apiError(error, "Unable to create your account. Please try again.");
   }
 }
